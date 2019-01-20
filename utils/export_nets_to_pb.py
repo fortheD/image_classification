@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from nets.vgg import vgg_a
+from nets import vgg 
 
 tf.app.flags.DEFINE_string(
     'output_file', 'output/net.pb', 'Where to save the resulting file to.')
@@ -22,7 +22,7 @@ def main(_):
     with tf.Graph().as_default() as graph:
 
         placeholder = tf.placeholder(name='input', dtype=tf.float32,shape=[None, 224, 224, 3])
-        vgg_a(placeholder)
+        vgg.build_vgg(placeholder, 3)
 
         graph_def = graph.as_graph_def()
         with tf.gfile.GFile(FLAGS.output_file, 'wb') as f:
