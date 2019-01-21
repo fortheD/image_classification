@@ -22,7 +22,10 @@ def main(_):
     with tf.Graph().as_default() as graph:
 
         placeholder = tf.placeholder(name='input', dtype=tf.float32,shape=[None, 224, 224, 3])
-        vgg.build_vgg(placeholder, 3)
+        vggnet = vgg.vgg()
+        vggnet.build(placeholder, 3, type='vgg19')
+
+        tf.summary.FileWriter("output", graph)
 
         graph_def = graph.as_graph_def()
         with tf.gfile.GFile(FLAGS.output_file, 'wb') as f:
@@ -30,4 +33,4 @@ def main(_):
 
 
 if __name__ == '__main__':
-  tf.app.run()
+    tf.app.run()
