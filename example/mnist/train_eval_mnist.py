@@ -6,7 +6,7 @@ import tensorflow as tf
 
 import dataset
 
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-3
 
 flags = tf.app.flags
 tf.flags.DEFINE_string('data_dir', '/tmp/mnist_data', 'The data directory')
@@ -111,7 +111,7 @@ def model_fn(features, labels, mode, params):
     if mode == tf.estimator.ModeKeys.PREDICT:
         logits = model(image, training=False)
         predictions = {
-            'classes': tf.arg_max(logits, axis=1),
+            'classes': tf.argmax(logits, axis=1),
             'probabilities': tf.nn.softmax(logits),
         }
         return tf.estimator.EstimatorSpec(
