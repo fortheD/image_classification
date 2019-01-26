@@ -33,19 +33,25 @@ class net:
             out = tf.nn.xw_plus_b(input, w, b, name=scope.name)
             return tf.nn.relu(out)
 
-    def conv_bn_leakyLayer(self, input, feature_num, name, feature=[3,3], stride=[1,1], padding="SAME", training=False):
+    def conv_bn_leakyLayer(self, input, feature_num, name, feature=[3,3], stride=[1,1], padding="SAME", training=False, active=True):
         channels = int(input.get_shape()[-1])
         with tf.variable_scope(name):
             w = tf.get_variable("w", shape = [feature[0], feature[1], channels, feature_num])
             conv2d = tf.nn.conv2d(input, w, strides = [1, stride[0], stride[1], 1], padding = padding)
             bn_layer = tf.layers.batch_normalization(conv2d, training=training)
-            active_layer = tf.nn.leaky_relu(bn_layer)
-            return active_layer
+            if active:
+                active_layer = tf.nn.leaky_relu(bn_layer)
+                return active_layer
+            else:
+                return bn_layer
     
-    def bottleneckLayer(self, input, input_layers, output_layers, name):
-        layer1 = self.conv_bn_leakyLayer(input, input_layers, name+"_1", feature=[1,1])
+    def bottleneckLayer(self, input, input_layers, output_layers, name, stride=[1,1], pooling=False):
+        if pooling:
+            layer1 = self.conv_bn_leakyLayer(input, input_layers, name+"_1", feature=[1,1], stride=[2,2])
+        else:
+            layer1 = self.conv_bn_leakyLayer(input, input_layers, name+"_1", feature=[1,1])
         layer2 = self.conv_bn_leakyLayer(layer1, input_layers, name+"_2", feature=[3,3])
-        layer3 = self.conv_bn_leakyLayer(layer2, output_layers, name+"_3", feature=[1,1])
+        layer3 = self.conv_bn_leakyLayer(layer2, output_layers, name+"_3", feature=[1,1], active=False)
         return layer3
     
     def zeropaddingLayer(self, input, add_rows, add_cols):
