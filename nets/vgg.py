@@ -41,13 +41,13 @@ class vgg(net.net):
         pool5 = self.maxpoolLayer(conv5_3, "pool5")
 
         fcIn = tf.reshape(pool5, [-1, 7*7*512])
-        fc6 = self.fcLayer(fcIn, 7*7*512, 4096, "fc6")
+        fc6 = self.fcLayer(fcIn, 4096, "fc6")
         dropout1 = self.dropout(fc6, 0.7)
 
-        fc7 = self.fcLayer(dropout1, 4096, 4096, "fc7")
+        fc7 = self.fcLayer(dropout1, 4096, "fc7")
         dropout2 = self.dropout(fc7, 0.7)
 
-        fc8 = self.fcLayer(dropout2, 4096, class_num, "fc8")
+        fc8 = self.fcLayer(dropout2, class_num, "fc8")
         return fc8        
 
     def build_vgg19(self, input, class_num):
@@ -80,13 +80,13 @@ class vgg(net.net):
         pool5 = self.maxpoolLayer(conv5_4, "pool5")
 
         fcIn = tf.reshape(pool5, [-1, 7*7*512])
-        fc6 = self.fcLayer(fcIn, 7*7*512, 4096, "fc6")
+        fc6 = self.fcLayer(fcIn, 4096, "fc6")
         dropout1 = self.dropout(fc6, 0.7)
 
-        fc7 = self.fcLayer(dropout1, 4096, 4096, "fc7")
+        fc7 = self.fcLayer(dropout1, 4096, "fc7")
         dropout2 = self.dropout(fc7, 0.7)
 
-        fc8 = self.fcLayer(dropout2, 4096, class_num, "fc8")
+        fc8 = self.fcLayer(dropout2, class_num, "fc8")
         return fc8
 
 

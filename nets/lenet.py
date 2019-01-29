@@ -14,7 +14,7 @@ class lenet(net.net):
         pool2 = self.maxpoolLayer(conv2, "pool2") #[None, 5, 5, 16]
 
         fcIn = tf.reshape(pool2, [-1, 5*5*16])
-        fc1 = self.fcLayer(fcIn, 5*5*16, 120, name="fc1")
-        fc2 = self.fcLayer(fc1, 120, 84, name="fc2")
-        fc3 = self.fcLayer(fc2, 84, class_num, name="fc3")
+        fc1 = self.fcLayer(fcIn, 120, name="fc1")
+        fc2 = self.fcLayer(fc1, 84, name="fc2")
+        fc3 = self.fcLayer(fc2, class_num, name="fc3")
         return fc3
