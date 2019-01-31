@@ -115,3 +115,10 @@ def train(directory):
 def test(directory):
   """tf.data.Dataset object for MNIST test data."""
   return dataset(directory, 't10k-images-idx3-ubyte', 't10k-labels-idx1-ubyte')
+
+if __name__ == "__main__":
+  dataset = test('/tmp/mnist_data')
+  next_element = dataset.make_one_shot_iterator().get_next()
+  with tf.Session() as sess:
+      print(sess.run(next_element))
+

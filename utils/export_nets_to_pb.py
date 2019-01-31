@@ -5,7 +5,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from nets import vgg
-from nets import resnet_v1 
+from nets import resnet_v1_test 
 
 tf.app.flags.DEFINE_string(
     'output_file', 'output/net.pb', 'Where to save the resulting file to.')
@@ -22,16 +22,14 @@ def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
     with tf.Graph().as_default() as graph:
 
-        placeholder = tf.placeholder(name='input', dtype=tf.float32,shape=[None, 224, 224, 3])
-        resnet = resnet_v1.resnet_v1()
-        resnet.build(placeholder, 3, type='resnet50')
-
+        placeholder = tf.placeholder(name='input', dtype=tf.float32,shape=[None, 32, 32, 3])
+        model = resnet_v1_test.resnet_v1(50, 10, "channels_last")
+        output = model(placeholder, training=True)
         tf.summary.FileWriter("output", graph)
 
         graph_def = graph.as_graph_def()
         with tf.gfile.GFile(FLAGS.output_file, 'wb') as f:
             f.write(graph_def.SerializeToString())
-
 
 if __name__ == '__main__':
     tf.app.run()
