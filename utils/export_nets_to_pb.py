@@ -5,7 +5,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from nets import vgg
-from nets import resnet_v1_test 
+from nets import resnet_v1
 
 tf.app.flags.DEFINE_string(
     'output_file', 'output/net.pb', 'Where to save the resulting file to.')
@@ -23,7 +23,7 @@ def main(_):
     with tf.Graph().as_default() as graph:
 
         placeholder = tf.placeholder(name='input', dtype=tf.float32,shape=[None, 32, 32, 3])
-        model = resnet_v1_test.resnet_v1(50, 10, "channels_last")
+        model = resnet_v1.resnet_v1(152, 10, "channels_last")
         output = model(placeholder, training=True)
         tf.summary.FileWriter("output", graph)
 
