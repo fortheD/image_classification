@@ -78,7 +78,7 @@ class resnet_v1(object):
 
         with tf.variable_scope("scale3"):
             conv3_1_branch1 = self._bottleneckLayer(conv2_3, 128, 512, pooling=True, training=training, name="block1") #[None ,28, 28, 512]
-            conv3_1_conv_branch2 = tf.layers.conv2d(conv2_3, 512, kernel_size=[3,3], strides=[2,2], padding="same", name="identify_conv") #[None ,28, 28, 512]
+            conv3_1_conv_branch2 = tf.layers.conv2d(conv2_3, 512, kernel_size=[3,3], strides=[2,2], padding="same", data_format=self.data_format, name="identify_conv") #[None ,28, 28, 512]
             conv3_1_bn_branch2 = tf.layers.batch_normalization(conv3_1_conv_branch2, axis=1 if self.data_format == 'channels_first' else 3, training=training) #[None ,28, 28, 512]
             conv3_1_add = self.shortcut(conv3_1_branch1, conv3_1_bn_branch2, name="shortcut4") #[None ,28, 28, 512]
             conv3_1 = tf.nn.relu(conv3_1_add) #[None ,28, 28, 512]
@@ -97,7 +97,7 @@ class resnet_v1(object):
 
         with tf.variable_scope("scale4"):
             conv4_1_branch1 = self._bottleneckLayer(conv3_4, 256, 1024, pooling=True, training=training, name="block1") #[None ,14, 14, 1024]
-            conv4_1_conv_branch2 = tf.layers.conv2d(conv3_4, 1024, kernel_size=[3,3], strides=[2,2], padding="same", name="identify_conv") #[None ,14, 14, 1024]
+            conv4_1_conv_branch2 = tf.layers.conv2d(conv3_4, 1024, kernel_size=[3,3], strides=[2,2], padding="same", data_format=self.data_format, name="identify_conv") #[None ,14, 14, 1024]
             conv4_1_bn_branch2 = tf.layers.batch_normalization(conv4_1_conv_branch2, axis=1 if self.data_format == 'channels_first' else 3, training=training) #[None ,14, 14, 1024]
             conv4_1_add = self.shortcut(conv4_1_branch1, conv4_1_bn_branch2, name="shortcut8") #[None ,14, 14, 1024]
             conv4_1 = tf.nn.relu(conv4_1_add) #[None ,14, 14, 1024]
@@ -124,7 +124,7 @@ class resnet_v1(object):
         
         with tf.variable_scope("scale5"):
             conv5_1_branch1 = self._bottleneckLayer(conv4_6, 512, 2048, pooling=True, training=training, name="block1") #[None ,7, 7, 2048]
-            conv5_1_conv_branch2 = tf.layers.conv2d(conv4_6, 2048, kernel_size=[3,3], strides=[2,2], padding="same", name="identify_conv") #[None ,7, 7, 2048]
+            conv5_1_conv_branch2 = tf.layers.conv2d(conv4_6, 2048, kernel_size=[3,3], strides=[2,2], padding="same", data_format=self.data_format, name="identify_conv") #[None ,7, 7, 2048]
             conv5_1_bn_branch2 = tf.layers.batch_normalization(conv5_1_conv_branch2, axis=1 if self.data_format == 'channels_first' else 3, training=training) #[None ,7, 7, 2048]
             conv5_1_add = self.shortcut(conv5_1_branch1, conv5_1_bn_branch2, name="shortcut14") #[None ,7, 7, 2048]
             conv5_1 = tf.nn.relu(conv5_1_add) #[None ,7, 7, 2048]

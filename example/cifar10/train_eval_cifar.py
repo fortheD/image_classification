@@ -12,7 +12,7 @@ LEARNING_RATE = 1e-4
 
 flags = tf.app.flags
 tf.flags.DEFINE_string('data_dir', '/tmp/cifar10_data/cifar-10-batches-bin', 'The data directory')
-tf.flags.DEFINE_string('model_dir', '/tmp/cifar_model', 'The model directory')
+tf.flags.DEFINE_string('model_dir', '/tmp/cifar10_model', 'The model directory')
 tf.flags.DEFINE_string('export_dir', '', 'The export model directory')
 tf.flags.DEFINE_integer('batch_size', '100', 'The training dataset batch size')
 tf.flags.DEFINE_integer('train_epochs', '40', 'The training epochs')
