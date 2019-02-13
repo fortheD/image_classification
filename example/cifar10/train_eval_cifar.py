@@ -21,6 +21,8 @@ tf.flags.DEFINE_integer('epochs_between_evals', '1', 'The number of training epo
 FLAGS = flags.FLAGS
 
 def model_fn(features, labels, mode, params):
+    weight_decay = 2e-4
+
     model = resnet_v1(50, 10, params['data_format'])
     image = features
     if isinstance(image, dict):
@@ -32,6 +34,11 @@ def model_fn(features, labels, mode, params):
         #logits = model(image, training=True)
         logits = model(image, training=True)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
+        # Add weight decay to the loss.
+        l2_loss = weight_decay * tf.add_n(
+            # loss is computed using fp32 for numerical stability.
+            [tf.nn.l2_loss(tf.cast(v, tf.float32)) for v in tf.trainable_variables()])
+        loss = loss + l2_loss
         accuracy = tf.metrics.accuracy(labels=labels, predictions=tf.argmax(logits, axis=1))
 
         tf.identity(LEARNING_RATE, 'learning_rate')
@@ -50,6 +57,13 @@ def model_fn(features, labels, mode, params):
         #logits = model(image, training=False)
         logits = model(image, training=True)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
+
+        # Add weight decay to the loss.
+        l2_loss = weight_decay * tf.add_n(
+            # loss is computed using fp32 for numerical stability.
+            [tf.nn.l2_loss(tf.cast(v, tf.float32)) for v in tf.trainable_variables()])
+        loss = loss + l2_loss
+
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.EVAL,
             loss=loss,
@@ -105,7 +119,7 @@ def run_cifar(flags):
     
     #Export the model
     if flags.export_dir is not None:
-        image = tf.placeholder(tf.float32, [None, 28, 28])
+        image = tf.placeholder(tf.float32, [None, 32, 32, 3])
         input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(
             {'image': image,}
         )
