@@ -84,7 +84,8 @@ def model_fn(features, labels, mode, params):
         image = features['image']
     
     if mode == tf.estimator.ModeKeys.TRAIN:
-        optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,momentum=0.9)
+        learning_rate = learning_rate_fn(tf.train.get_or_create_global_step())
+        optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
         tf.summary.scalar('learning_rate', learning_rate)
 
         logits = model(image, training=True)
