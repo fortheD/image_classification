@@ -76,6 +76,27 @@ def build_block_v1(inputs, filters, training, projection_shortcut, strides, data
     inputs = tf.nn.relu(inputs)
     return inputs
 
+def build_block_v2(inputs, filters, training, projection_shortcut, strides, data_format):
+    shortcut = inputs
+
+    inputs = batch_norm(inputs, training, data_format)
+    inputs = tf.nn.relu(inputs)
+
+    if projection_shortcut is not None:
+        shortcut = projection_shortcut(inputs)
+
+    inputs = conv2d_fixed_padding(inputs=inputs, filters=filters, kernel_size=1, strides=1, data_format=data_format)
+
+    inputs = batch_norm(inputs, training, data_format)
+    inputs = tf.nn.relu(inputs)
+    inputs = conv2d_fixed_padding(inputs=inputs, filters=filters, kernel_size=3, strides=strides, data_format=data_format)
+
+    inputs = batch_norm(inputs, training, data_format)
+    inputs = tf.nn.relu(inputs)
+    inputs = conv2d_fixed_padding(inputs=inputs, filters=filters*4, kernel_size=1, strides=1, data_format=data_format)
+
+    return inputs + shortcut
+
 def block_layer(inputs, filters, block_fn, blocks, strides, training, name, data_format):
 
     def projection_shortcut(inputs):
@@ -99,7 +120,7 @@ def post_process(inputs, num_classes, data_format):
     return inputs
 
 
-class resnet_v1(object):
+class resnet(object):
     '''Class of resnet v1 model'''
     
     def __init__(self, resnet_size, num_class, data_format, resnet_version):
@@ -107,6 +128,13 @@ class resnet_v1(object):
         self.num_class = num_class
         self.data_format = data_format
         self.resnet_version = resnet_version
+
+        if resnet_version !=1 or resnet_version != 2:
+            raise ValueError("The resnet version %d is wrong" % resnet_version)
+        if resnet_version == 1:
+            self.block_fn = build_block_v1
+        elif resnet_version == 2:
+            self.block_fn = build_block_v2
     
     def __call__(self, inputs, training):
         if self.data_format == 'channels_first':
@@ -133,16 +161,16 @@ class resnet_v1(object):
                 inputs = tf.nn.relu(inputs)
 
         with tf.variable_scope("block2"):
-            inputs = block_layer(inputs, filters=64, block_fn=build_block_v1, blocks=3, strides=2, training=training, name="scale2", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=64, block_fn=self.block_fn, blocks=3, strides=2, training=training, name="scale2", data_format=self.data_format)
         
         with tf.variable_scope("block3"):
-            inputs = block_layer(inputs, filters=128, block_fn=build_block_v1, blocks=4, strides=2, training=training, name="scale3", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=128, block_fn=self.block_fn, blocks=4, strides=2, training=training, name="scale3", data_format=self.data_format)
 
         with tf.variable_scope("block4"):
-            inputs = block_layer(inputs, filters=256, block_fn=build_block_v1, blocks=6, strides=2, training=training, name="scale4", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=256, block_fn=self.block_fn, blocks=6, strides=2, training=training, name="scale4", data_format=self.data_format)
 
         with tf.variable_scope("block5"):
-            inputs = block_layer(inputs, filters=512, block_fn=build_block_v1, blocks=3, strides=2, training=training, name="scale5", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=512, block_fn=self.block_fn, blocks=3, strides=2, training=training, name="scale5", data_format=self.data_format)
         
         outputs = post_process(inputs, num_classes=num_classes, data_format=self.data_format)
         return outputs
@@ -157,16 +185,16 @@ class resnet_v1(object):
                 inputs = tf.nn.relu(inputs)
 
         with tf.variable_scope("block2"):
-            inputs = block_layer(inputs, filters=64, block_fn=build_block_v1, blocks=3, strides=2, training=training, name="scale2", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=64, block_fn=self.block_fn, blocks=3, strides=2, training=training, name="scale2", data_format=self.data_format)
         
         with tf.variable_scope("block3"):
-            inputs = block_layer(inputs, filters=128, block_fn=build_block_v1, blocks=4, strides=2, training=training, name="scale3", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=128, block_fn=self.block_fn, blocks=4, strides=2, training=training, name="scale3", data_format=self.data_format)
 
         with tf.variable_scope("block4"):
-            inputs = block_layer(inputs, filters=256, block_fn=build_block_v1, blocks=23, strides=2, training=training, name="scale4", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=256, block_fn=self.block_fn, blocks=23, strides=2, training=training, name="scale4", data_format=self.data_format)
 
         with tf.variable_scope("block5"):
-            inputs = block_layer(inputs, filters=512, block_fn=build_block_v1, blocks=3, strides=2, training=training, name="scale5", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=512, block_fn=self.block_fn, blocks=3, strides=2, training=training, name="scale5", data_format=self.data_format)
         
         outputs = post_process(inputs, num_classes=num_classes, data_format=self.data_format)
         return outputs
@@ -181,22 +209,22 @@ class resnet_v1(object):
                 inputs = tf.nn.relu(inputs)
 
         with tf.variable_scope("block2"):
-            inputs = block_layer(inputs, filters=64, block_fn=build_block_v1, blocks=3, strides=2, training=training, name="scale2", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=64, block_fn=self.block_fn, blocks=3, strides=2, training=training, name="scale2", data_format=self.data_format)
         
         with tf.variable_scope("block3"):
-            inputs = block_layer(inputs, filters=128, block_fn=build_block_v1, blocks=8, strides=2, training=training, name="scale3", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=128, block_fn=self.block_fn, blocks=8, strides=2, training=training, name="scale3", data_format=self.data_format)
 
         with tf.variable_scope("block4"):
-            inputs = block_layer(inputs, filters=256, block_fn=build_block_v1, blocks=36, strides=2, training=training, name="scale4", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=256, block_fn=self.block_fn, blocks=36, strides=2, training=training, name="scale4", data_format=self.data_format)
 
         with tf.variable_scope("block5"):
-            inputs = block_layer(inputs, filters=512, block_fn=build_block_v1, blocks=3, strides=2, training=training, name="scale5", data_format=self.data_format)
+            inputs = block_layer(inputs, filters=512, block_fn=self.block_fn, blocks=3, strides=2, training=training, name="scale5", data_format=self.data_format)
         
         outputs = post_process(inputs, num_classes=num_classes, data_format=self.data_format)
         return outputs
 
 if __name__ == "__main__":
-    model = resnet_v1(152, 10, "channels_first", resnet_version=1)
+    model = resnet(152, 10, "channels_first", resnet_version=1)
     inputs = tf.placeholder(tf.float32, shape=[None, 224, 224, 3], name='input')
     output = model(inputs, training=True)
     print(output.get_shape().as_list())
