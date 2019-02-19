@@ -8,28 +8,90 @@ import dataset
 
 from nets.resnet_v1 import resnet_v1
 
+import resnet_model
+
 LEARNING_RATE = 1e-4
 
 flags = tf.app.flags
 tf.flags.DEFINE_string('data_dir', '/tmp/cifar10_data/cifar-10-batches-bin', 'The data directory')
 tf.flags.DEFINE_string('model_dir', '/tmp/cifar10_model', 'The model directory')
 tf.flags.DEFINE_string('export_dir', '', 'The export model directory')
-tf.flags.DEFINE_integer('batch_size', '100', 'The training dataset batch size')
-tf.flags.DEFINE_integer('train_epochs', '40', 'The training epochs')
+tf.flags.DEFINE_integer('batch_size', '128', 'The training dataset batch size')
+tf.flags.DEFINE_integer('train_epochs', '300', 'The training epochs')
 tf.flags.DEFINE_integer('epochs_between_evals', '1', 'The number of training epochs to run between evaluation')
 
 FLAGS = flags.FLAGS
 
+################################################################################
+# Functions for running training/eval/validation loops for the model.
+################################################################################
+def learning_rate_with_decay(
+    batch_size, batch_denom, num_images, boundary_epochs, decay_rates,
+    base_lr=0.1, warmup=False):
+  """Get a learning rate that decays step-wise as training progresses.
+
+  Args:
+    batch_size: the number of examples processed in each training batch.
+    batch_denom: this value will be used to scale the base learning rate.
+      `0.1 * batch size` is divided by this number, such that when
+      batch_denom == batch_size, the initial learning rate will be 0.1.
+    num_images: total number of images that will be used for training.
+    boundary_epochs: list of ints representing the epochs at which we
+      decay the learning rate.
+    decay_rates: list of floats representing the decay rates to be used
+      for scaling the learning rate. It should have one more element
+      than `boundary_epochs`, and all elements should have the same type.
+    base_lr: Initial learning rate scaled based on batch_denom.
+    warmup: Run a 5 epoch warmup to the initial lr.
+  Returns:
+    Returns a function that takes a single argument - the number of batches
+    trained so far (global_step)- and returns the learning rate to be used
+    for training the next batch.
+  """
+  initial_learning_rate = base_lr * batch_size / batch_denom
+  batches_per_epoch = num_images / batch_size
+
+  # Reduce the learning rate at certain epochs.
+  # CIFAR-10: divide by 10 at epoch 100, 150, and 200
+  # ImageNet: divide by 10 at epoch 30, 60, 80, and 90
+  boundaries = [int(batches_per_epoch * epoch) for epoch in boundary_epochs]
+  vals = [initial_learning_rate * decay for decay in decay_rates]
+
+  def learning_rate_fn(global_step):
+    """Builds scaled learning rate function with 5 epoch warm up."""
+    lr = tf.train.piecewise_constant(global_step, boundaries, vals)
+    if warmup:
+      warmup_steps = int(batches_per_epoch * 5)
+      warmup_lr = (
+          initial_learning_rate * tf.cast(global_step, tf.float32) / tf.cast(
+              warmup_steps, tf.float32))
+      return tf.cond(global_step < warmup_steps, lambda: warmup_lr, lambda: lr)
+    return lr
+
+  return learning_rate_fn
+
+  # Learning rate schedule follows arXiv:1512.03385 for ResNet-56 and under.
+learning_rate_fn = learning_rate_with_decay(
+    batch_size=128, batch_denom=128,
+    num_images=50000, boundary_epochs=[91, 136, 182],
+    decay_rates=[1, 0.1, 0.01, 0.001])
+
 def model_fn(features, labels, mode, params):
     weight_decay = 2e-4
 
-    model = resnet_v1(50, 10, params['data_format'])
+    # model = resnet_v1(50, 10, params['data_format'])
+    model = resnet_model.Model(resnet_size=56, bottleneck=True,
+    num_classes=10, num_filters=16, kernel_size=3, conv_stride=1,
+    first_pool_size=None, first_pool_stride=None, block_sizes=[9]*3, block_strides=[1,2,2],
+    resnet_version=1, data_format="channels_last", dtype=tf.float32)    
+    
     image = features
     if isinstance(image, dict):
         image = features['image']
     
     if mode == tf.estimator.ModeKeys.TRAIN:
-        optimizer = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE)
+        optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,momentum=0.9)
+        tf.summary.scalar('learning_rate', learning_rate)
 
         #logits = model(image, training=True)
         logits = model(image, training=True)
