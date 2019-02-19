@@ -8,8 +8,6 @@ import dataset
 
 from nets.resnet_v1 import resnet_v1
 
-import resnet_model
-
 LEARNING_RATE = 1e-4
 
 flags = tf.app.flags
@@ -79,11 +77,7 @@ learning_rate_fn = learning_rate_with_decay(
 def model_fn(features, labels, mode, params):
     weight_decay = 2e-4
 
-    # model = resnet_v1(50, 10, params['data_format'])
-    model = resnet_model.Model(resnet_size=56, bottleneck=True,
-    num_classes=10, num_filters=16, kernel_size=3, conv_stride=1,
-    first_pool_size=None, first_pool_stride=None, block_sizes=[9]*3, block_strides=[1,2,2],
-    resnet_version=1, data_format="channels_last", dtype=tf.float32)    
+    model = resnet_v1(50, 10, params['data_format'], resnet_version=1)  
     
     image = features
     if isinstance(image, dict):
@@ -93,7 +87,6 @@ def model_fn(features, labels, mode, params):
         optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,momentum=0.9)
         tf.summary.scalar('learning_rate', learning_rate)
 
-        #logits = model(image, training=True)
         logits = model(image, training=True)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
         # Add weight decay to the loss.
