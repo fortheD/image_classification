@@ -129,13 +129,13 @@ class resnet(object):
         self.data_format = data_format
         self.resnet_version = resnet_version
 
-        if resnet_version !=1 or resnet_version != 2:
-            raise ValueError("The resnet version %d is wrong" % resnet_version)
         if resnet_version == 1:
             self.block_fn = build_block_v1
         elif resnet_version == 2:
             self.block_fn = build_block_v2
-    
+        else:
+            raise ValueError("The resnet version %d is wrong" % resnet_version)
+
     def __call__(self, inputs, training):
         if self.data_format == 'channels_first':
             # Convert the inputs from channels_last (NHWC) to channels_first (NCHW).
@@ -148,6 +148,9 @@ class resnet(object):
             return self.build_resnet101(inputs, training, self.num_class)
         elif self.resnet_size == 152:
             return self.build_resnet152(inputs, training, self.num_class)
+        elif self.resnet_size == 56:
+            #build a resnet architecture for cifar10
+            return self.build_resnet_cifar(inputs, training, self.num_class)
         else:
             raise ValueError("The resnet size %d is not supported" % self.resnet_size)
 
@@ -175,7 +178,7 @@ class resnet(object):
         outputs = post_process(inputs, num_classes=num_classes, data_format=self.data_format)
         return outputs
     
-    def build_resnet101(self, inputs, training, num_class):
+    def build_resnet101(self, inputs, training, num_classes):
         '''Assume the input shape is [None, 224, 224, 3]'''
         with tf.variable_scope("block1"):
             inputs = conv2d_fixed_padding(inputs, filters=64, kernel_size=3, strides=1, data_format=self.data_format)
@@ -199,7 +202,7 @@ class resnet(object):
         outputs = post_process(inputs, num_classes=num_classes, data_format=self.data_format)
         return outputs
     
-    def build_resnet152(self, inputs, training, num_class):
+    def build_resnet152(self, inputs, training, num_classes):
         '''Assume the input shape is [None, 224, 224, 3]'''
         with tf.variable_scope("block1"):
             inputs = conv2d_fixed_padding(inputs, filters=64, kernel_size=3, strides=1, data_format=self.data_format)
@@ -220,6 +223,27 @@ class resnet(object):
         with tf.variable_scope("block5"):
             inputs = block_layer(inputs, filters=512, block_fn=self.block_fn, blocks=3, strides=2, training=training, name="scale5", data_format=self.data_format)
         
+        outputs = post_process(inputs, num_classes=num_classes, data_format=self.data_format)
+        return outputs
+
+    def build_resnet_cifar(self, inputs, training, num_classes):
+        '''The input shape is [None, 32, 32, 3]'''
+        with tf.variable_scope("block1"):
+            inputs = conv2d_fixed_padding(inputs, filters=16, kernel_size=3, strides=1, data_format=self.data_format)
+            inputs = tf.identity(inputs, 'initial_conv')
+            if self.resnet_version == 1:
+                inputs = batch_norm(inputs, training, self.data_format)
+                inputs = tf.nn.relu(inputs)
+
+        with tf.variable_scope("block2"):
+            inputs = block_layer(inputs, filters=16, block_fn=self.block_fn, blocks=9, strides=1, training=training, name="scale2", data_format=self.data_format)
+
+        with tf.variable_scope("block3"):
+            inputs = block_layer(inputs, filters=32, block_fn=self.block_fn, blocks=9, strides=2, training=training, name="scale3", data_format=self.data_format)
+
+        with tf.variable_scope("block4"):
+            inputs = block_layer(inputs, filters=64, block_fn=self.block_fn, blocks=9, strides=2, training=training, name="scale4", data_format=self.data_format)
+
         outputs = post_process(inputs, num_classes=num_classes, data_format=self.data_format)
         return outputs
 

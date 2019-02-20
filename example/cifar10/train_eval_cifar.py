@@ -15,7 +15,7 @@ tf.flags.DEFINE_string('data_dir', '/tmp/cifar10_data/cifar-10-batches-bin', 'Th
 tf.flags.DEFINE_string('model_dir', '/tmp/cifar10_model', 'The model directory')
 tf.flags.DEFINE_string('export_dir', '', 'The export model directory')
 tf.flags.DEFINE_integer('batch_size', '128', 'The training dataset batch size')
-tf.flags.DEFINE_integer('train_epochs', '300', 'The training epochs')
+tf.flags.DEFINE_integer('train_epochs', '250', 'The training epochs')
 tf.flags.DEFINE_integer('epochs_between_evals', '1', 'The number of training epochs to run between evaluation')
 
 FLAGS = flags.FLAGS
@@ -77,7 +77,7 @@ learning_rate_fn = learning_rate_with_decay(
 def model_fn(features, labels, mode, params):
     weight_decay = 2e-4
 
-    model = resnet(50, 10, params['data_format'], resnet_version=1)  
+    model = resnet(56, 10, params['data_format'], resnet_version=2)  
     
     image = features
     if isinstance(image, dict):
@@ -97,7 +97,7 @@ def model_fn(features, labels, mode, params):
         loss = loss + l2_loss
         accuracy = tf.metrics.accuracy(labels=labels, predictions=tf.argmax(logits, axis=1))
 
-        tf.identity(LEARNING_RATE, 'learning_rate')
+        tf.identity(learning_rate, 'learning_rate')
         tf.identity(loss, 'cross_entropy')
         tf.identity(accuracy[1], name='train_accuracy')
 
@@ -110,7 +110,6 @@ def model_fn(features, labels, mode, params):
             train_op=optimizer.minimize(loss, tf.train.get_or_create_global_step()))
     
     if mode == tf.estimator.ModeKeys.EVAL:
-        #logits = model(image, training=False)
         logits = model(image, training=True)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
 
