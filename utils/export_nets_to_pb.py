@@ -4,10 +4,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from nets import nets_factory
-from nets import resnet_v1
-
-import resnet_model
+from nets import resnet
+from nets import vgg
 
 tf.app.flags.DEFINE_string(
     'output_file', 'output/net.pb', 'Where to save the resulting file to.')
@@ -25,11 +23,12 @@ def main(_):
     with tf.Graph().as_default() as graph:
 
         placeholder = tf.placeholder(name='input', dtype=tf.float32,shape=[None, 32, 32, 3])
-        model = resnet_v1.resnet_v1(50, 10, "channels_last", resnet_version=1)
+        model = vgg.vgg(10, data_format="channels_last", vgg_version=19)
         output = model(placeholder, training=False)
-        print(output.get_shape().as_list())
-        tf.summary.FileWriter("output", graph)
 
+        print(output.get_shape().as_list())
+
+        tf.summary.FileWriter("output", graph)
         graph_def = graph.as_graph_def()
         with tf.gfile.GFile(FLAGS.output_file, 'wb') as f:
             f.write(graph_def.SerializeToString())

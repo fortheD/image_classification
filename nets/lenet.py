@@ -11,7 +11,7 @@ class lenet(object):
             # Convert the inputs from channels_last (NHWC) to channels_first (NCHW).
             # This provides a large performance boost on GPU.
             inputs = tf.transpose(inputs, [0, 3, 1, 2])
-        return self.build(inputs, self.num_classes)        
+        return self.build(inputs, self.num_classes)
 
     def build(self, inputs, num_classes):
         # Assume the input size is [None, 28, 28, 1]
