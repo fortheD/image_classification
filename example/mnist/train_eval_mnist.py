@@ -6,6 +6,8 @@ import tensorflow as tf
 
 import dataset
 
+from nets.lenet import lenet
+
 LEARNING_RATE = 1e-3
 
 flags = tf.app.flags
@@ -18,71 +20,17 @@ tf.flags.DEFINE_integer('epochs_between_evals', '1', 'The number of training epo
 
 FLAGS = flags.FLAGS
 
-def create_model(data_format):
-    """Model to recognize digits in the MNIST dataset.
-
-    Network structure is equivalent to:
-    https://github.com/tensorflow/tensorflow/blob/r1.5/tensorflow/examples/tutorials/mnist/mnist_deep.py
-    and
-    https://github.com/tensorflow/models/blob/master/tutorials/image/mnist/convolutional.py
-
-    But uses the tf.keras API.
-
-    Args:
-    data_format: Either 'channels_first' or 'channels_last'. 'channels_first' is
-        typically faster on GPUs while 'channels_last' is typically faster on
-        CPUs. See
-        https://www.tensorflow.org/performance/performance_guide#data_formats
-
-    Returns:
-    A tf.keras.Model.
-    """
-    if data_format == 'channels_first':
-        input_shape = [1, 28, 28]
-    else:
-        assert data_format == 'channels_last'
-        input_shape = [28, 28, 1]
-
-    l = tf.keras.layers
-    max_pool = l.MaxPooling2D(
-        (2, 2), (2, 2), padding='same', data_format=data_format)
-    # The model consists of a sequential chain of layers, so tf.keras.Sequential
-    # (a subclass of tf.keras.Model) makes for a compact description.
-    return tf.keras.Sequential(
-        [
-            l.Reshape(
-                target_shape=input_shape,
-                input_shape=(28 * 28,)),
-            l.Conv2D(
-                32,
-                5,
-                padding='same',
-                data_format=data_format,
-                activation=tf.nn.relu),
-            max_pool,
-            l.Conv2D(
-                64,
-                5,
-                padding='same',
-                data_format=data_format,
-                activation=tf.nn.relu),
-            max_pool,
-            l.Flatten(),
-            l.Dense(1024, activation=tf.nn.relu),
-            l.Dropout(0.4),
-            l.Dense(10)
-        ])
-
 def model_fn(features, labels, mode, params):
-    model = create_model(params['data_format'])
+    model = lenet(10, params['data_format'])
     image = features
     if isinstance(image, dict):
         image = features['image']
+    image = tf.reshape(image, [-1, 28, 28, 1])
     
     if mode == tf.estimator.ModeKeys.TRAIN:
         optimizer = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE)
 
-        logits = model(image, training=True)
+        logits = model(image)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
         accuracy = tf.metrics.accuracy(labels=labels, predictions=tf.argmax(logits, axis=1))
 
@@ -99,7 +47,7 @@ def model_fn(features, labels, mode, params):
             train_op=optimizer.minimize(loss, tf.train.get_or_create_global_step()))
     
     if mode == tf.estimator.ModeKeys.EVAL:
-        logits = model(image, training=False)
+        logits = model(image)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.EVAL,
@@ -109,7 +57,7 @@ def model_fn(features, labels, mode, params):
             })
     
     if mode == tf.estimator.ModeKeys.PREDICT:
-        logits = model(image, training=False)
+        logits = model(image)
         predictions = {
             'classes': tf.argmax(logits, axis=1),
             'probabilities': tf.nn.softmax(logits),
