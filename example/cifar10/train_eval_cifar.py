@@ -77,7 +77,7 @@ learning_rate_fn = learning_rate_with_decay(
 def model_fn(features, labels, mode, params):
     weight_decay = 2e-4
 
-    model = resnet(56, 10, params['data_format'], resnet_version=2)  
+    model = resnet(56, 10, params['data_format'], resnet_version=1)  
     
     image = features
     if isinstance(image, dict):
