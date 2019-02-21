@@ -1,2 +1,2 @@
-# object_detection
-tensorflow object detetion 
+# image_classification
+image classifier including lenet,vgg,resnet,inception
