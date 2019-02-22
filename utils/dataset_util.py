@@ -14,9 +14,11 @@
 # ==============================================================================
 
 """Utility functions for creating TFRecord data sets."""
+import os
 
 import tensorflow as tf
 
+LABELS_FILENAME = 'labels.txt'
 
 def int64_feature(value):
   return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
@@ -37,6 +39,30 @@ def bytes_list_feature(value):
 def float_list_feature(value):
   return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
+
+def image_to_tfexample(image_data, image_format, height, width, class_id):
+  return tf.train.Example(features=tf.train.Features(feature={
+      'image/encoded': bytes_feature(image_data),
+      'image/format': bytes_feature(image_format),
+      'image/class/label': int64_feature(class_id),
+      'image/height': int64_feature(height),
+      'image/width': int64_feature(width),
+  }))
+
+def write_label_file(labels_to_class_names, dataset_dir,
+                     filename=LABELS_FILENAME):
+  """Writes a file with the list of class names.
+
+  Args:
+    labels_to_class_names: A map of (integer) labels to class names.
+    dataset_dir: The directory in which the labels file should be written.
+    filename: The filename where the class names are written.
+  """
+  labels_filename = os.path.join(dataset_dir, filename)
+  with tf.gfile.Open(labels_filename, 'w') as f:
+    for label in labels_to_class_names:
+      class_name = labels_to_class_names[label]
+      f.write('%d:%s\n' % (label, class_name))
 
 def read_examples_list(path):
   """Read list of training or validation examples.
