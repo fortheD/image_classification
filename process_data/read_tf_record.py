@@ -37,12 +37,14 @@ def get_dataset(is_training, record_dir):
     dataset = tf.data.TFRecordDataset(record_names)
     return dataset
 
-def preprocess_image(image, is_training):
+def preprocess_image(image, height, width, is_training):
     image = tf.cast(image, tf.float32)
+    image.set_shape([None, None, 3])
     if is_training:
-        imgae = tf.image.resize_image_with_crop_or_pad(image, HEIGHT+8, WIDTH+8)
-        image = tf.random_crop(image, [HEIGHT, WIDTH, NUM_CHANNELS])
+        imgae = tf.image.resize_image_with_crop_or_pad(image, height+8, width+8)
+        image = tf.random_crop(image, [height, width, 3])
         image = tf.image.random_flip_left_right(image)
+    image = tf.image.resize_images(image, [224, 224])
     image = tf.image.per_image_standardization(image)
     return image
 
@@ -55,7 +57,9 @@ def _parse_function(example_proto, is_training):
     parsed_features = tf.parse_single_example(example_proto, features)
     image = tf.image.decode_image(parsed_features["image/encoded"])
     label = parsed_features["image/class/label"]
-    image = preprocess_image(image, is_training)
+    height = tf.cast(parsed_features["image/height"], tf.int32)
+    width = tf.cast(parsed_features["image/width"], tf.int32)
+    image = preprocess_image(image, height, width, is_training)
     return image, label
 
 def train(record_dir):

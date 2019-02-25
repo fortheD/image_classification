@@ -113,7 +113,7 @@ def _convert_record(split_name, filenames, class_names_to_ids, output_dir):
                         class_name = os.path.basename(os.path.dirname(filenames[i]))
                         class_id = class_names_to_ids[class_name]
 
-                        example = dataset_util.image_to_tfexample(image_data, b'jpg', height, width, class_id)
+                        example = dataset_util.image_to_tfexample(image_data, b'jpeg', height, width, class_id)
                         tfrecord_writer.write(example.SerializeToString())
     sys.stdout.write('\n')
     sys.stdout.flush()

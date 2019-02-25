@@ -146,7 +146,7 @@ def run_cifar(flags):
 
     data_format = ('channels_first' if tf.test.is_built_with_cuda() else 'channels_last')
 
-    mnist_classifier = tf.estimator.Estimator(
+    classifier = tf.estimator.Estimator(
         model_fn=model_fn,
         model_dir=flags.model_dir,
         config=run_config,
@@ -165,8 +165,8 @@ def run_cifar(flags):
         return dataset.test(flags.data_dir).batch(flags.batch_size).make_one_shot_iterator().get_next()
     
     for _ in range(flags.train_epochs // flags.epochs_between_evals):
-        mnist_classifier.train(input_fn=train_input_fn)
-        eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
+        classifier.train(input_fn=train_input_fn)
+        eval_results = classifier.evaluate(input_fn=eval_input_fn)
         tf.logging.info('\nEvaluation results:\n\t%s\n' % eval_results)
 
         if eval_results['accuracy'] > 0.99:
@@ -178,7 +178,7 @@ def run_cifar(flags):
         input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(
             {'image': image,}
         )
-        mnist_classifier.export_savedmodel(flags.export_dir, input_fn, strip_default_attrs=True)
+        classifier.export_savedmodel(flags.export_dir, input_fn, strip_default_attrs=True)
     
 
 
