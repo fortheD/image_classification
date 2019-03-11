@@ -12,8 +12,8 @@ import tensorflow as tf
 from utils import dataset_util
 
 flags = tf.app.flags
-tf.flags.DEFINE_string('image_dir', 'image', 'The image directory')
-tf.flags.DEFINE_string('output_dir', '/tmp/record', 'The output tf_record directory')
+tf.flags.DEFINE_string('image_dir', '/home/leike/proj/MOTData/pedestrian', 'The image directory')
+tf.flags.DEFINE_string('output_dir', '/home/leike/proj/MOTData/record', 'The output tf_record directory')
 
 FLAGS = flags.FLAGS
 
@@ -72,7 +72,6 @@ def _get_filenames_and_classes(image_dir):
         for filename in os.listdir(directory):
             path = os.path.join(directory, filename)
             photo_filenames.append(path)
-
     return photo_filenames, sorted(class_names)
 
 def _get_record_filename(output_dir, split_name, shard_id):
@@ -109,7 +108,6 @@ def _convert_record(split_name, filenames, class_names_to_ids, output_dir):
                         #Get the image data
                         image_data = tf.gfile.GFile(filenames[i], 'rb').read()
                         height, width = image_reader.read_image_dims(sess, image_data)
-
                         class_name = os.path.basename(os.path.dirname(filenames[i]))
                         class_id = class_names_to_ids[class_name]
 

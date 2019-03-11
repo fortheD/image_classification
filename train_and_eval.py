@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-import dataset
+# import dataset
 
 from nets.resnet import resnet
 from process_data.read_tf_record import train, val
@@ -12,10 +12,10 @@ from process_data.read_tf_record import train, val
 LEARNING_RATE = 3e-4
 
 flags = tf.app.flags
-tf.flags.DEFINE_string('data_dir', '/tmp/record', 'The data directory')
-tf.flags.DEFINE_string('model_dir', '/tmp/cifar10_model', 'The model directory')
+tf.flags.DEFINE_string('data_dir', '/home/leike/proj/MOTData/record', 'The data directory')
+tf.flags.DEFINE_string('model_dir', '/tmp/pedestrian_model', 'The model directory')
 tf.flags.DEFINE_string('export_dir', '', 'The export model directory')
-tf.flags.DEFINE_integer('batch_size', '8', 'The training dataset batch size')
+tf.flags.DEFINE_integer('batch_size', '128', 'The training dataset batch size')
 tf.flags.DEFINE_integer('train_epochs', '250', 'The training epochs')
 tf.flags.DEFINE_integer('epochs_between_evals', '1', 'The number of training epochs to run between evaluation')
 
@@ -71,24 +71,24 @@ def learning_rate_with_decay(
 
   # Learning rate schedule follows arXiv:1512.03385 for ResNet-56 and under.
 learning_rate_fn = learning_rate_with_decay(
-    batch_size=8, batch_denom=8,
-    num_images=3303, boundary_epochs=[90, 160, 200],
+    batch_size=128, batch_denom=128,
+    num_images=62712, boundary_epochs=[90, 160, 200],
     decay_rates=[1, 0.1, 0.01, 0.001])
 
 def model_fn(features, labels, mode, params):
     weight_decay = 2e-4
 
-    model = resnet(50, 10, params['data_format'], resnet_version=1)  
+    model = resnet(56, 2, params['data_format'], resnet_version=1)  
     
     image = features
     if isinstance(image, dict):
         image = features['image']
     
     if mode == tf.estimator.ModeKeys.TRAIN:
-        # learning_rate = learning_rate_fn(tf.train.get_or_create_global_step())
-        # optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
-        learning_rate = tf.train.exponential_decay(LEARNING_RATE, tf.train.get_or_create_global_step(), decay_steps=20000, decay_rate=0.5, staircase=True)
-        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+        learning_rate = learning_rate_fn(tf.train.get_or_create_global_step())
+        optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
+        # learning_rate = tf.train.exponential_decay(LEARNING_RATE, tf.train.get_or_create_global_step(), decay_steps=20000, decay_rate=0.5, staircase=True)
+        # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         tf.summary.scalar('learning_rate', learning_rate)
 
         logits = model(image, training=True)

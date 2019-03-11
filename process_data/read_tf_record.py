@@ -9,7 +9,7 @@ import tensorflow as tf
 from utils import dataset_util
 
 flags = tf.app.flags
-tf.flags.DEFINE_string('tfrecord_dir', '/tmp/record', 'The tf_record directory')
+tf.flags.DEFINE_string('tfrecord_dir', '/home/leike/proj/MOTData/record', 'The tf_record directory')
 
 FLAGS = flags.FLAGS
 
@@ -44,7 +44,7 @@ def preprocess_image(image, height, width, is_training):
         imgae = tf.image.resize_image_with_crop_or_pad(image, height+8, width+8)
         image = tf.random_crop(image, [height, width, 3])
         image = tf.image.random_flip_left_right(image)
-    image = tf.image.resize_images(image, [224, 224])
+    image = tf.image.resize_images(image, [40, 40])
     image = tf.image.per_image_standardization(image)
     return image
 
