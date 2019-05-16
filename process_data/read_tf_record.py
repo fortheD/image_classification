@@ -40,11 +40,11 @@ def get_dataset(is_training, record_dir):
 def preprocess_image(image, height, width, is_training):
     image = tf.cast(image, tf.float32)
     image.set_shape([None, None, 3])
-    if is_training:
-        imgae = tf.image.resize_image_with_crop_or_pad(image, height+8, width+8)
-        image = tf.random_crop(image, [height, width, 3])
-        image = tf.image.random_flip_left_right(image)
-    image = tf.image.resize_images(image, [40, 40])
+    # if is_training:
+    #     imgae = tf.image.resize_image_with_crop_or_pad(image, height+8, width+8)
+    #     image = tf.random_crop(image, [height, width, 3])
+    #     image = tf.image.random_flip_left_right(image)
+    image = tf.image.resize_images(image, [112, 112])
     image = tf.image.per_image_standardization(image)
     return image
 

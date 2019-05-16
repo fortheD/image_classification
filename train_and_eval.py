@@ -9,14 +9,14 @@ import tensorflow as tf
 from nets.resnet import resnet
 from process_data.read_tf_record import train, val
 
-LEARNING_RATE = 3e-4
+LEARNING_RATE = 1e-4
 
 flags = tf.app.flags
-tf.flags.DEFINE_string('data_dir', '/home/leike/proj/MOTData/record', 'The data directory')
-tf.flags.DEFINE_string('model_dir', '/tmp/pedestrian_model', 'The model directory')
+tf.flags.DEFINE_string('data_dir', '/home/leike/proj/traffic_sign/record', 'The data directory')
+tf.flags.DEFINE_string('model_dir', '/tmp/traffic_model', 'The model directory')
 tf.flags.DEFINE_string('export_dir', '', 'The export model directory')
-tf.flags.DEFINE_integer('batch_size', '128', 'The training dataset batch size')
-tf.flags.DEFINE_integer('train_epochs', '250', 'The training epochs')
+tf.flags.DEFINE_integer('batch_size', '16', 'The training dataset batch size')
+tf.flags.DEFINE_integer('train_epochs', '200', 'The training epochs')
 tf.flags.DEFINE_integer('epochs_between_evals', '1', 'The number of training epochs to run between evaluation')
 
 FLAGS = flags.FLAGS
@@ -71,14 +71,14 @@ def learning_rate_with_decay(
 
   # Learning rate schedule follows arXiv:1512.03385 for ResNet-56 and under.
 learning_rate_fn = learning_rate_with_decay(
-    batch_size=128, batch_denom=128,
-    num_images=62712, boundary_epochs=[90, 160, 200],
+    batch_size=16, batch_denom=16,
+    num_images=18231, boundary_epochs=[90, 160, 200],
     decay_rates=[1, 0.1, 0.01, 0.001])
 
 def model_fn(features, labels, mode, params):
     weight_decay = 2e-4
 
-    model = resnet(56, 2, params['data_format'], resnet_version=1)  
+    model = resnet(56, 20, params['data_format'], resnet_version=1)  
     
     image = features
     if isinstance(image, dict):
@@ -100,18 +100,20 @@ def model_fn(features, labels, mode, params):
         loss = loss + l2_loss
         accuracy = tf.metrics.accuracy(labels=labels, predictions=tf.argmax(logits, axis=1))
 
-        tf.identity(learning_rate, 'learning_rate')
+        #tf.identity(learning_rate, 'learning_rate')
         tf.identity(loss, 'cross_entropy')
         tf.identity(accuracy[1], name='train_accuracy')
 
         #save accuracy scalar to Tensorboard output
         tf.summary.scalar('train_accuracy', accuracy[1])
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+          train_op = optimizer.minimize(loss, tf.train.get_or_create_global_step())
+          return tf.estimator.EstimatorSpec(
+              mode=tf.estimator.ModeKeys.TRAIN,
+              loss=loss,
+              train_op=train_op)
 
-        return tf.estimator.EstimatorSpec(
-            mode=tf.estimator.ModeKeys.TRAIN,
-            loss=loss,
-            train_op=optimizer.minimize(loss, tf.train.get_or_create_global_step()))
-    
     if mode == tf.estimator.ModeKeys.EVAL:
         logits = model(image, training=True)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
@@ -143,8 +145,12 @@ def model_fn(features, labels, mode, params):
             })
 
 def run(flags):
-    session_config = tf.ConfigProto(allow_soft_placement=True)
+    # mirrored_strategy = tf.distribute.MirroredStrategy()
 
+    session_config = tf.ConfigProto(allow_soft_placement=True)
+    # session_config = tf.ConfigProto()
+
+    # run_config = tf.estimator.RunConfig(session_config=session_config, train_distribute=mirrored_strategy, eval_distribute=mirrored_strategy)
     run_config = tf.estimator.RunConfig(session_config=session_config)
 
     data_format = ('channels_first' if tf.test.is_built_with_cuda() else 'channels_last')
@@ -159,21 +165,21 @@ def run(flags):
     #Set up training input function
     def train_input_fn():
         ds = train(flags.data_dir)
-        ds = ds.cache().shuffle(buffer_size=50000).batch(flags.batch_size)
+        ds = ds.cache().shuffle(buffer_size=20000).batch(flags.batch_size)
         ds = ds.repeat(flags.epochs_between_evals)
         return ds
     
     #Set up evaluation input function
     def eval_input_fn():
-        return val(flags.data_dir).batch(flags.batch_size).make_one_shot_iterator().get_next()
+        return val(flags.data_dir).batch(flags.batch_size)
     
     for _ in range(flags.train_epochs // flags.epochs_between_evals):
         classifier.train(input_fn=train_input_fn)
         eval_results = classifier.evaluate(input_fn=eval_input_fn)
         tf.logging.info('\nEvaluation results:\n\t%s\n' % eval_results)
 
-        if eval_results['accuracy'] > 0.99:
-            break
+        # if eval_results['accuracy'] > 0.99:
+        #     break
     
     #Export the model
     if flags.export_dir is not None:
