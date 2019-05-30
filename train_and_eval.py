@@ -87,8 +87,6 @@ def model_fn(features, labels, mode, params):
     if mode == tf.estimator.ModeKeys.TRAIN:
         learning_rate = learning_rate_fn(tf.train.get_or_create_global_step())
         optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
-        # learning_rate = tf.train.exponential_decay(LEARNING_RATE, tf.train.get_or_create_global_step(), decay_steps=20000, decay_rate=0.5, staircase=True)
-        # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         tf.summary.scalar('learning_rate', learning_rate)
 
         logits = model(image, training=True)
@@ -118,12 +116,6 @@ def model_fn(features, labels, mode, params):
         logits = model(image, training=True)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
 
-        # Add weight decay to the loss.
-        l2_loss = weight_decay * tf.add_n(
-            # loss is computed using fp32 for numerical stability.
-            [tf.nn.l2_loss(tf.cast(v, tf.float32)) for v in tf.trainable_variables()])
-        loss = loss + l2_loss
-
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.EVAL,
             loss=loss,
@@ -145,12 +137,8 @@ def model_fn(features, labels, mode, params):
             })
 
 def run(flags):
-    # mirrored_strategy = tf.distribute.MirroredStrategy()
-
     session_config = tf.ConfigProto(allow_soft_placement=True)
-    # session_config = tf.ConfigProto()
 
-    # run_config = tf.estimator.RunConfig(session_config=session_config, train_distribute=mirrored_strategy, eval_distribute=mirrored_strategy)
     run_config = tf.estimator.RunConfig(session_config=session_config)
 
     data_format = ('channels_first' if tf.test.is_built_with_cuda() else 'channels_last')
@@ -177,9 +165,6 @@ def run(flags):
         classifier.train(input_fn=train_input_fn)
         eval_results = classifier.evaluate(input_fn=eval_input_fn)
         tf.logging.info('\nEvaluation results:\n\t%s\n' % eval_results)
-
-        # if eval_results['accuracy'] > 0.99:
-        #     break
     
     #Export the model
     if flags.export_dir is not None:
