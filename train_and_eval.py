@@ -178,7 +178,7 @@ def run(flags):
 
 
 def main(_):
-    tf.logging.set_verbosity(tf.logging.INFO)    
+    tf.logging.set_verbosity(tf.logging.INFO)
     run(FLAGS)
 
 if __name__ == '__main__':

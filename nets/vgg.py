@@ -96,6 +96,3 @@ class vgg(object):
 
         fc8 = tf.layers.dense(dropout2, num_classes, name="fc8")
         return fc8
-
-
-    
