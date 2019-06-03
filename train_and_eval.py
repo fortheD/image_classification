@@ -80,7 +80,7 @@ def model_fn(features, labels, mode, params):
     weight_decay = 2e-4
 
     # model = resnet(56, 20, params['data_format'], resnet_version=1)
-    model = ResNetV1("resnet50", 20, params['data_format'], resnet_version=1)
+    model = ResNetV1("resnet50", 20, params['data_format'])
     
     image = features
     if isinstance(image, dict):
