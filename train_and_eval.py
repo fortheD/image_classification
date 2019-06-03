@@ -7,6 +7,7 @@ import tensorflow as tf
 # import dataset
 
 from nets.resnet import resnet
+from nets.resnetv1 import ResNetV1
 from process_data.read_tf_record import train, val
 
 LEARNING_RATE = 1e-4
@@ -78,7 +79,8 @@ learning_rate_fn = learning_rate_with_decay(
 def model_fn(features, labels, mode, params):
     weight_decay = 2e-4
 
-    model = resnet(56, 20, params['data_format'], resnet_version=1)  
+    # model = resnet(56, 20, params['data_format'], resnet_version=1)
+    model = ResNetV1("resnet50", 20, params['data_format'], resnet_version=1)
     
     image = features
     if isinstance(image, dict):
