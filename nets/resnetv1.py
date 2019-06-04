@@ -99,7 +99,13 @@ class ResNetV1(object):
 
     def __call__(self, input_tensor, training):
         """Build a ResNet Graph
+        training: True for training, False for inference
         """
+        if self.data_format == 'channels_first':
+            # Convert the inputs from channels_last (NHWC) to channels_first (NCHW).
+            # This provides a large performance boost on GPU. See
+            # https://www.tensorflow.org/performance/performance_guide#data_formats            
+            input_tensor = tf.transpose(input_tensor, [0, 3, 1, 2])        
         # Stage 1
         x = ZeroPadding2D((3, 3), data_format=self.data_format)(input_tensor)
         x = Conv2D(64, (7, 7), strides=(2, 2), name='conv1', use_bias=True, data_format=self.data_format)(x)

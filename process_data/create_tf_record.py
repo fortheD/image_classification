@@ -11,14 +11,6 @@ import tensorflow as tf
 
 from utils import dataset_util
 
-flags = tf.app.flags
-tf.flags.DEFINE_string('image_dir', '/home/leike/proj/MOTData/pedestrian', 'The image directory')
-tf.flags.DEFINE_string('output_dir', '/home/leike/proj/MOTData/record', 'The output tf_record directory')
-
-FLAGS = flags.FLAGS
-
-tf.logging.set_verbosity(tf.logging.INFO)
-
 # Seed for repeatability
 _RANDOM_SEED = 0
 
@@ -48,7 +40,7 @@ class ImageReader(object):
         assert image.shape[2] == 3
         return image
 
-def _get_filenames_and_classes(image_dir):
+def get_filenames_and_classes(image_dir):
     """Returns a list of filenames and inferred class names.
 
     Args:
@@ -74,12 +66,12 @@ def _get_filenames_and_classes(image_dir):
             photo_filenames.append(path)
     return photo_filenames, sorted(class_names)
 
-def _get_record_filename(output_dir, split_name, shard_id):
+def get_record_filename(output_dir, split_name, shard_id):
     """Return the output record filenames"""
     output_filename = 'images_%s_%05d-of-%05d.tfrecord' % (split_name, shard_id, _NUM_SHARDS)
     return os.path.join(output_dir, output_filename)
 
-def _convert_record(split_name, filenames, class_names_to_ids, output_dir):
+def convert_record(split_name, filenames, class_names_to_ids, output_dir):
     """Convert the given filenames to a TFRecord dataset.
 
     Args:
@@ -97,7 +89,7 @@ def _convert_record(split_name, filenames, class_names_to_ids, output_dir):
         image_reader = ImageReader()
         with tf.Session() as sess:
             for shard_id in range(_NUM_SHARDS):
-                output_filename = _get_record_filename(output_dir, split_name, shard_id)
+                output_filename = get_record_filename(output_dir, split_name, shard_id)
                 # Create tfrecord writer
                 with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
                     start_ndx = shard_id * num_per_shard
@@ -116,50 +108,11 @@ def _convert_record(split_name, filenames, class_names_to_ids, output_dir):
     sys.stdout.write('\n')
     sys.stdout.flush()
 
-def _record_exists(output_dir):
+def record_exists(output_dir):
     """Judge whether the record exists"""
     for split_name in ['train', 'validation']:
         for shard_id in range(_NUM_SHARDS):
-            output_filename = _get_record_filename(output_dir, split_name, shard_id)
+            output_filename = get_record_filename(output_dir, split_name, shard_id)
             if not tf.gfile.Exists(output_filename):
                 return False
     return True
-
-def main(_):
-    assert FLAGS.image_dir, '`image_dir ` missing'
-    assert FLAGS.output_dir, '`output_dir` missing'
-    if not tf.gfile.IsDirectory(FLAGS.output_dir):
-        tf.gfile.MakeDirs(FLAGS.output_dir)
-
-    image_dir = FLAGS.image_dir
-    output_dir = FLAGS.output_dir
-
-    if _record_exists(output_dir):
-        print('Record files already exist')
-        return
-
-    photo_filenames, class_names = _get_filenames_and_classes(image_dir)
-    class_names_to_ids = dict(zip(class_names, range(len(class_names))))
-
-    #Divide into train and test record
-    random.seed(_RANDOM_SEED)
-    random.shuffle(photo_filenames)
-
-    photo_nums = len(photo_filenames)
-    validation_nums = int(photo_nums * _RATE_VAL_ALL)
-
-    training_filenames = photo_filenames[validation_nums:]
-    validation_filenames = photo_filenames[:validation_nums]
-
-    #convert the training and validation record
-    _convert_record('train', training_filenames, class_names_to_ids, output_dir)
-    _convert_record('validation', validation_filenames, class_names_to_ids, output_dir)
-
-    # Finally, write the label file
-    label_to_class_names = dict(zip(range(len(class_names)), class_names))
-    dataset_util.write_label_file(label_to_class_names, image_dir)
-
-    tf.logging.info("Translate complete")
-
-if __name__ == '__main__':
-    tf.app.run()

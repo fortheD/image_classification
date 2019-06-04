@@ -8,13 +8,6 @@ import tensorflow as tf
 
 from utils import dataset_util
 
-flags = tf.app.flags
-tf.flags.DEFINE_string('tfrecord_dir', '/home/leike/proj/MOTData/record', 'The tf_record directory')
-
-FLAGS = flags.FLAGS
-
-tf.logging.set_verbosity(tf.logging.INFO)
-
 def get_recordnames(is_training, record_dir):
     """""Returns a list of tensorflow record names"""
     assert tf.gfile.Exists(record_dir), ('The record directory do not exists')
@@ -77,11 +70,3 @@ def _read_tf_record(record_dir):
         image, img_format = sess.run(next_element)
         print(image)
         print(img_format)
-
-def main(_):
-    assert FLAGS.tfrecord_dir, '`tfrecord_dir` missing'
-    record_dir = FLAGS.tfrecord_dir
-    _read_tf_record(record_dir)
-
-if __name__ == '__main__':
-    tf.app.run()
