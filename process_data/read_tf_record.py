@@ -30,18 +30,18 @@ def get_dataset(is_training, record_dir):
     dataset = tf.data.TFRecordDataset(record_names)
     return dataset
 
-def preprocess_image(image, height, width, is_training):
+def preprocess_image(image, height, width, input_shape, is_training):
     image = tf.cast(image, tf.float32)
-    image.set_shape([None, None, 3])
+    image.set_shape([None, None, input_shape[2]])
     # if is_training:
     #     imgae = tf.image.resize_image_with_crop_or_pad(image, height+8, width+8)
     #     image = tf.random_crop(image, [height, width, 3])
     #     image = tf.image.random_flip_left_right(image)
-    image = tf.image.resize_images(image, [112, 112])
+    image = tf.image.resize_images(image, [input_shape[0], input_shape[1]])
     image = tf.image.per_image_standardization(image)
     return image
 
-def _parse_function(example_proto, is_training):
+def _parse_function(example_proto, input_shape, is_training):
     features = {"image/encoded": tf.FixedLenFeature((), tf.string, default_value=""),
                 "image/format": tf.FixedLenFeature((), tf.string, default_value="jpeg"),
                 "image/class/label": tf.FixedLenFeature((), tf.int64, default_value=0),
@@ -52,16 +52,16 @@ def _parse_function(example_proto, is_training):
     label = parsed_features["image/class/label"]
     height = tf.cast(parsed_features["image/height"], tf.int32)
     width = tf.cast(parsed_features["image/width"], tf.int32)
-    image = preprocess_image(image, height, width, is_training)
+    image = preprocess_image(image, height, width, input_shape, is_training)
     return image, label
 
-def train(record_dir):
+def train(record_dir, input_shape):
     dataset = get_dataset(is_training=True, record_dir=record_dir)
-    return dataset.map(lambda record:_parse_function(record, True))
+    return dataset.map(lambda record:_parse_function(record, input_shape, True))
 
-def val(record_dir):
+def val(record_dir, input_shape):
     dataset = get_dataset(is_training=False, record_dir=record_dir)
-    return dataset.map(lambda record:_parse_function(record, False))
+    return dataset.map(lambda record:_parse_function(record, input_shape, False))
 
 def _read_tf_record(record_dir):
     dataset = val(record_dir)

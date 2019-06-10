@@ -22,7 +22,7 @@ def batch_norm(inputs, training, data_format):
         momentum=_BATCH_NORM_DECAY, epsilon=_BATCH_NORM_EPSILON, center=True,
         scale=True, training=training, fused=True)
 
-class ResNetV1(object):
+class ResNetV2(object):
     '''
     The class of resnet(version1)
     '''
@@ -31,8 +31,9 @@ class ResNetV1(object):
         architecture: Can be resnet50, resnet101, resnet152
         classes: The classification task classes
         data_format: channel_first or channel_last, channel_first will run faster in GPU
+        training: True for training, False for inference
         """
-        super(ResNetV1, self).__init__()
+        super(ResNetV2, self).__init__()
         assert architecture in ['resnet50', 'resnet101', 'resnet152']
         assert data_format in ['channels_first', 'channels_last']
         self.architecture = architecture
@@ -56,19 +57,20 @@ class ResNetV1(object):
         conv_name_base = 'res' + str(stage) + block + '_branch'
         bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-        x = Conv2D(filter1, (1, 1), name=conv_name_base+'2a', use_bias=use_bias, data_format=data_format)(input_tensor)
         # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2a')(x, training=training)
-        x = batch_norm(x, training=training, data_format=data_format)
-        x = Activation('relu')(x)
+        input_tensor = batch_norm(input_tensor, training=training, data_format=data_format)
+        input_tensor = Activation('relu')(input_tensor)
 
-        x = Conv2D(filter2, (kernel_size, kernel_size), padding='same', name=conv_name_base+'2b', use_bias=use_bias, data_format=data_format)(x)
+        x = Conv2D(filter1, (1, 1), name=conv_name_base+'2a', use_bias=use_bias, data_format=data_format)(input_tensor)
+
         # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2b')(x, training=training)
         x = batch_norm(x, training=training, data_format=data_format)
         x = Activation('relu')(x)
+        x = Conv2D(filter2, (kernel_size, kernel_size), padding='same', name=conv_name_base+'2b', use_bias=use_bias, data_format=data_format)(x)
 
-        x = Conv2D(filter3, (1, 1), name=conv_name_base+'2c', use_bias=use_bias, data_format=data_format)(x)
         # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2c')(x, training=training)
         x = batch_norm(x, training=training, data_format=data_format)
+        x = Conv2D(filter3, (1, 1), name=conv_name_base+'2c', use_bias=use_bias, data_format=data_format)(x)
 
         x = Add()([x, input_tensor])
         x = Activation('relu', name='res'+str(stage)+block+'_out')(x)
@@ -93,24 +95,25 @@ class ResNetV1(object):
         conv_name_base = 'res' + str(stage) + block + '_branch'
         bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-        x = Conv2D(filter1, (1, 1), strides=strides, name=conv_name_base+'2a', use_bias=use_bias, data_format=data_format)(input_tensor)
         # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2a')(x, training=training)
-        x = batch_norm(x, training=training, data_format=data_format)
-        x = Activation('relu')(x)
+        input_tensor = batch_norm(input_tensor, training=training, data_format=data_format)
+        input_tensor = Activation('relu')(input_tensor)
 
-        x = Conv2D(filter2, (kernel_size, kernel_size), padding='same', name=conv_name_base+'2b', use_bias=use_bias, data_format=data_format)(x)
+        x = Conv2D(filter1, (1, 1), strides=strides, name=conv_name_base+'2a', use_bias=use_bias, data_format=data_format)(input_tensor)
+
         # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2b')(x, training=training)
         x = batch_norm(x, training=training, data_format=data_format)
         x = Activation('relu')(x)
+        x = Conv2D(filter2, (kernel_size, kernel_size), padding='same', name=conv_name_base+'2b', use_bias=use_bias, data_format=data_format)(x)
 
-        x = Conv2D(filter3, (1, 1), name=conv_name_base+'2c', use_bias=use_bias, data_format=data_format)(x)
         # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2c')(x, training=training)
         x = batch_norm(x, training=training, data_format=data_format)
+        x = Activation('relu')(x)
+        x = Conv2D(filter3, (1, 1), name=conv_name_base+'2c', use_bias=use_bias, data_format=data_format)(x)
+
         shortcut = Conv2D(filter3, (1, 1), strides=strides, name=conv_name_base+'1', use_bias=use_bias, data_format=data_format)(input_tensor)
-        # shortcut = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'1')(shortcut, training=training)
-        shortcut = batch_norm(shortcut, training=training, data_format=data_format)
+
         x = Add()([x, shortcut])
-        x = Activation('relu', name='res'+str(stage)+block+'_out')(x)
         return x
 
     def __call__(self, input_tensor, training):

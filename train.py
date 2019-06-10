@@ -35,6 +35,9 @@ def run(flags):
     if not tf.gfile.IsDirectory(flags.tfrecord_dir):
         tf.gfile.MakeDirs(flags.tfrecord_dir)
 
+    # Define nerve network input shape
+    input_shape = (299, 299, 3)
+
     image_dir = flags.image_dir
     record_dir = flags.tfrecord_dir
 
@@ -72,7 +75,7 @@ def run(flags):
 
     data_format = ('channels_first' if tf.test.is_built_with_cuda() else 'channels_last')
 
-    classifier = Classifier("ResNet50", len(class_names), data_format)
+    classifier = Classifier("InceptionV3", len(class_names), data_format)
     estimator = tf.estimator.Estimator(
         model_fn=classifier.model_fn,
         model_dir=flags.model_dir,
@@ -82,14 +85,14 @@ def run(flags):
 
     #Set up training input function
     def train_input_fn():
-        ds = train(record_dir)
+        ds = train(record_dir, input_shape)
         ds = ds.cache().shuffle(buffer_size=20000).batch(flags.batch_size)
         ds = ds.repeat(1)
         return ds
     
     #Set up evaluation input function
     def eval_input_fn():
-        return val(record_dir).batch(flags.batch_size)
+        return val(record_dir, input_shape).batch(flags.batch_size)
 
     for _ in range(flags.train_epochs):
         estimator.train(input_fn=train_input_fn)
@@ -98,7 +101,7 @@ def run(flags):
 
     #Export the model as saved_model format
     if flags.export_dir is not None:
-        image = tf.placeholder(tf.float32, [None, 32, 32, 3])
+        image = tf.placeholder(tf.float32, [None, input_shape[0], input_shape[1], input_shape[2]])
         input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(
             {'image': image,}
         )

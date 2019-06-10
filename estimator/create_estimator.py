@@ -81,13 +81,15 @@ class Classifier():
             tf.summary.scalar('train_loss', train_loss)
             tf.summary.scalar('train_accuracy', accuracy[1])
 
-            train_op = optimizer.minimize(train_loss, tf.train.get_or_create_global_step())
-            return tf.estimator.EstimatorSpec(
-                mode=tf.estimator.ModeKeys.TRAIN,
-                loss=train_loss,
-                train_op=train_op)
+            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            with tf.control_dependencies(update_ops):
+                train_op = optimizer.minimize(train_loss, tf.train.get_or_create_global_step())
+                return tf.estimator.EstimatorSpec(
+                    mode=tf.estimator.ModeKeys.TRAIN,
+                    loss=train_loss,
+                    train_op=train_op)
 
-        elif mode == tf.estimator.ModeKeys.EVAL:
+        if mode == tf.estimator.ModeKeys.EVAL:
             logits = self.model(features, training=True)
             eval_loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
 
@@ -101,7 +103,7 @@ class Classifier():
                 'accuracy':tf.metrics.accuracy(labels=labels, predictions=tf.argmax(logits, axis=1)),
                 })
 
-        elif mode == tf.estimator.ModeKeys.PREDICT:
+        if mode == tf.estimator.ModeKeys.PREDICT:
             logits = self.model(features, training=False)
             predictions = {
             'classes': tf.argmax(logits, axis=1),

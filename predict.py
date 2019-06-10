@@ -5,10 +5,11 @@ from __future__ import print_function
 import tensorflow as tf
 
 from train_and_eval import model_fn
+from estimator.create_estimator import Classifier
 
 flags = tf.app.flags
 tf.flags.DEFINE_string('checkpoint_dir', '/home/leike/proj/track_pedestrian/classifier', 'The checkpoint directory')
-tf.flags.DEFINE_string('img_path', '/home/leike/proj/traffic_sign/predict_image/1/7186d12152e94f13b2cb52021fc907db.jpg', 'The image path')
+tf.flags.DEFINE_string('img_path', '/home/leike/proj/traffic_sign/predict_image/2/f93426970f90479dac9384b65c376054.jpg', 'The image path')
 
 FLAGS = flags.FLAGS
 
@@ -23,10 +24,17 @@ def input_fn():
 
 def run(flags):
     warm_start_dir = flags.checkpoint_dir
-    model_dir = '/home/leike/proj/track_pedestrian/classifier'
+    model_dir = '/tmp/train'
     data_format = ('channels_first' if tf.test.is_built_with_cuda() else 'channels_last')
 
-    estimator = tf.estimator.Estimator(model_fn=model_fn, model_dir=model_dir, params={'data_format':data_format})
+    classifier = Classifier("ResNet50", 20, data_format)
+    estimator = tf.estimator.Estimator(
+        model_fn=classifier.model_fn,
+        model_dir=model_dir,
+        params={'image_nums':15000}
+    )
+
+    # estimator = tf.estimator.Estimator(model_fn=model_fn, model_dir=model_dir, params={'data_format':data_format})
     results = estimator.predict(input_fn)
     first = False
     for result in results:
