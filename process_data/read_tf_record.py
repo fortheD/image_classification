@@ -41,7 +41,7 @@ def preprocess_image(image, height, width, input_shape, is_training):
     image = tf.image.per_image_standardization(image)
     return image
 
-def _parse_function(example_proto, input_shape, is_training):
+def _parse_function(example_proto, input_shape, is_training, data_format):
     features = {"image/encoded": tf.FixedLenFeature((), tf.string, default_value=""),
                 "image/format": tf.FixedLenFeature((), tf.string, default_value="jpeg"),
                 "image/class/label": tf.FixedLenFeature((), tf.int64, default_value=0),
@@ -53,11 +53,13 @@ def _parse_function(example_proto, input_shape, is_training):
     height = tf.cast(parsed_features["image/height"], tf.int32)
     width = tf.cast(parsed_features["image/width"], tf.int32)
     image = preprocess_image(image, height, width, input_shape, is_training)
+    if data_format == "channels_first":
+        image = tf.transpose(image, [2, 0, 1])
     return image, label
 
-def train(record_dir, input_shape):
+def train(record_dir, input_shape, data_format):
     dataset = get_dataset(is_training=True, record_dir=record_dir)
-    return dataset.map(lambda record:_parse_function(record, input_shape, True))
+    return dataset.map(lambda record:_parse_function(record, input_shape, True, data_format))
 
 def val(record_dir, input_shape):
     dataset = get_dataset(is_training=False, record_dir=record_dir)

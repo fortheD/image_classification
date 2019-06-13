@@ -1,156 +1,160 @@
-from __future__ import absolute_import
-from __future__ import division
+# -*- coding: utf-8 -*-
+'''ResNetV1 model for Keras.
+
+# Reference:
+
+- [Deep Residual Learning for Image Recognition](https://arxiv.org/abs/1512.03385)
+
+Adapted from code contributed by BigMoyan.
+'''
 from __future__ import print_function
 
 import tensorflow as tf
 
-# from tensorflow.keras.layers import BatchNormalization
-from tensorflow.keras.layers import Conv2D
-from tensorflow.keras.layers import Activation, Add
-from tensorflow.keras.layers import ZeroPadding2D, MaxPool2D
+from tensorflow.keras.layers import Input
+from tensorflow.keras import layers
 from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import MaxPool2D
+from tensorflow.keras.layers import GlobalMaxPooling2D
+from tensorflow.keras.layers import ZeroPadding2D
+from tensorflow.keras.layers import AveragePooling2D
+from tensorflow.keras.layers import GlobalAveragePooling2D
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.models import Model
 
-_BATCH_NORM_DECAY = 0.997
-_BATCH_NORM_EPSILON = 1e-5
+def identity_block(input_tensor, kernel_size, filters, stage, block, data_format):
+    """The identity block is the block that has no conv layer at shortcut.
 
-def batch_norm(inputs, training, data_format):
-    """Performs a batch normalization using a standard set of parameters."""
-    # We set fused=True for a significant performance boost. See
-    # https://www.tensorflow.org/performance/performance_guide#common_fused_ops
-    return tf.layers.batch_normalization(
-        inputs=inputs, axis=1 if data_format == "channels_first" else 3,
-        momentum=_BATCH_NORM_DECAY, epsilon=_BATCH_NORM_EPSILON, center=True,
-        scale=True, training=training, fused=True)
+    # Arguments
+        input_tensor: input tensor
+        kernel_size: defualt 3, the kernel size of middle conv layer at main path
+        filters: list of integers, the filterss of 3 conv layer at main path
+        stage: integer, current stage label, used for generating layer names
+        block: 'a','b'..., current block label, used for generating layer names
 
-class ResNetV1(object):
-    '''
-    The class of resnet(version1)
-    '''
-    def __init__(self, architecture, classes, data_format):
-        """
-        architecture: Can be resnet50, resnet101, resnet152
-        classes: The classification task classes
-        data_format: channel_first or channel_last, channel_first will run faster in GPU
-        """
-        super(ResNetV1, self).__init__()
-        assert architecture in ['resnet50', 'resnet101', 'resnet152']
-        assert data_format in ['channels_first', 'channels_last']
-        self.architecture = architecture
-        self.classes = classes
-        self.data_format = data_format
+    # Returns
+        Output tensor for the block.
+    """
+    filters1, filters2, filters3 = filters
+    if data_format == 'channels_last':
+        bn_axis = 3
+    else:
+        bn_axis = 1
+    conv_name_base = 'res' + str(stage) + block + '_branch'
+    bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-    def identity_block(self, input_tensor, kernel_size, filters, stage, block, data_format,
-                    use_bias=True, training=True):
-        """The identity_block is the block that has no conv layer at shortcut
-        # Arguments
-            input_tensor: input tensor
-            kernel_size: default 3, the kernel size of middle conv layer at main path
-            filters: list of integers, the nb_filters of 3 conv layer at main path
-            stage: integer, current stage label, used for generating layer names
-            block: 'a','b'..., current block label, used for generating layer names
-            use_bias: Boolean. To use or not use a bias in conv layers.
-            train_bn: Boolean. Train or freeze Batch Norm layers
-        """
-        assert len(filters) == 3
-        filter1, filter2, filter3 =  filters
-        conv_name_base = 'res' + str(stage) + block + '_branch'
-        bn_name_base = 'bn' + str(stage) + block + '_branch'
+    x = Conv2D(filters1, (1, 1), name=conv_name_base + '2a')(input_tensor)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
+    x = Activation('relu')(x)
 
-        x = Conv2D(filter1, (1, 1), name=conv_name_base+'2a', use_bias=use_bias, data_format=data_format)(input_tensor)
-        # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2a')(x, training=training)
-        x = batch_norm(x, training=training, data_format=data_format)
-        x = Activation('relu')(x)
+    x = Conv2D(filters2, kernel_size,
+               padding='same', name=conv_name_base + '2b')(x)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
+    x = Activation('relu')(x)
 
-        x = Conv2D(filter2, (kernel_size, kernel_size), padding='same', name=conv_name_base+'2b', use_bias=use_bias, data_format=data_format)(x)
-        # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2b')(x, training=training)
-        x = batch_norm(x, training=training, data_format=data_format)
-        x = Activation('relu')(x)
+    x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
 
-        x = Conv2D(filter3, (1, 1), name=conv_name_base+'2c', use_bias=use_bias, data_format=data_format)(x)
-        # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2c')(x, training=training)
-        x = batch_norm(x, training=training, data_format=data_format)
+    x = layers.add([x, input_tensor])
+    x = Activation('relu')(x)
+    return x
 
-        x = Add()([x, input_tensor])
-        x = Activation('relu', name='res'+str(stage)+block+'_out')(x)
-        return x
 
-    def conv_block(self, input_tensor, kernel_size, filters, stage, block, data_format,
-                strides=(2, 2), use_bias=True, training=True):
-        """conv_block is the block that has a conv layer at shortcut
-        # Arguments
-            input_tensor: input tensor
-            kernel_size: default 3, the kernel size of middle conv layer at main path
-            filters: list of integers, the nb_filters of 3 conv layer at main path
-            stage: integer, current stage label, used for generating layer names
-            block: 'a','b'..., current block label, used for generating layer names
-            use_bias: Boolean. To use or not use a bias in conv layers.
-            train_bn: Boolean. Train or freeze Batch Norm layers
-        Note that from stage 3, the first conv layer at main path is with subsample=(2,2)
-        And the shortcut should have subsample=(2,2) as well
-        """
-        assert len(filters) == 3
-        filter1, filter2, filter3 = filters
-        conv_name_base = 'res' + str(stage) + block + '_branch'
-        bn_name_base = 'bn' + str(stage) + block + '_branch'
+def conv_block(input_tensor, kernel_size, filters, stage, block, data_format, strides=(2, 2)):
+    """conv_block is the block that has a conv layer at shortcut
 
-        x = Conv2D(filter1, (1, 1), strides=strides, name=conv_name_base+'2a', use_bias=use_bias, data_format=data_format)(input_tensor)
-        # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2a')(x, training=training)
-        x = batch_norm(x, training=training, data_format=data_format)
-        x = Activation('relu')(x)
+    # Arguments
+        input_tensor: input tensor
+        kernel_size: defualt 3, the kernel size of middle conv layer at main path
+        filters: list of integers, the filterss of 3 conv layer at main path
+        stage: integer, current stage label, used for generating layer names
+        block: 'a','b'..., current block label, used for generating layer names
 
-        x = Conv2D(filter2, (kernel_size, kernel_size), padding='same', name=conv_name_base+'2b', use_bias=use_bias, data_format=data_format)(x)
-        # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2b')(x, training=training)
-        x = batch_norm(x, training=training, data_format=data_format)
-        x = Activation('relu')(x)
+    # Returns
+        Output tensor for the block.
 
-        x = Conv2D(filter3, (1, 1), name=conv_name_base+'2c', use_bias=use_bias, data_format=data_format)(x)
-        # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'2c')(x, training=training)
-        x = batch_norm(x, training=training, data_format=data_format)
-        shortcut = Conv2D(filter3, (1, 1), strides=strides, name=conv_name_base+'1', use_bias=use_bias, data_format=data_format)(input_tensor)
-        # shortcut = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name=bn_name_base+'1')(shortcut, training=training)
-        shortcut = batch_norm(shortcut, training=training, data_format=data_format)
-        x = Add()([x, shortcut])
-        x = Activation('relu', name='res'+str(stage)+block+'_out')(x)
-        return x
+    Note that from stage 3, the first conv layer at main path is with strides=(2,2)
+    And the shortcut should have strides=(2,2) as well
+    """
+    filters1, filters2, filters3 = filters
+    if data_format == 'channels_last':
+        bn_axis = 3
+    else:
+        bn_axis = 1
+    conv_name_base = 'res' + str(stage) + block + '_branch'
+    bn_name_base = 'bn' + str(stage) + block + '_branch'
 
-    def __call__(self, input_tensor, training):
-        """Build a ResNet Graph
-        training: True for training, False for inference
-        """
-        if self.data_format == 'channels_first':
-            # Convert the inputs from channels_last (NHWC) to channels_first (NCHW).
-            # This provides a large performance boost on GPU. See
-            # https://www.tensorflow.org/performance/performance_guide#data_formats
-            input_tensor = tf.transpose(input_tensor, [0, 3, 1, 2])
-        # Stage 1
-        x = ZeroPadding2D((3, 3), data_format=self.data_format)(input_tensor)
-        x = Conv2D(64, (7, 7), strides=(2, 2), name='conv1', use_bias=True, data_format=self.data_format)(x)
-        # x = BatchNormalization(axis=(-1, 1)[self.data_format=="channels_first"], name='bn_conv1')(x, training=training)
-        x = batch_norm(x, training=training, data_format=self.data_format)
-        x = Activation('relu')(x)
-        C1 = x = MaxPool2D((3, 3), strides=(2, 2), padding="same", data_format=self.data_format)(x)
-        # Stage 2
-        x = self.conv_block(x, 3, [64, 64, 256], stage=2, block='a', data_format=self.data_format, strides=(1, 1), training=training)
-        x = self.identity_block(x, 3, [64, 64, 256], stage=2, block='b', data_format=self.data_format, training=training)
-        C2 = x = self.identity_block(x, 3, [64, 64, 256], stage=2, block='c', data_format=self.data_format, training=training)
-        # Stage 3
-        x = self.conv_block(x, 3, [128, 128, 512], stage=3, block='a', data_format=self.data_format, training=training)
-        block_count = {"resnet50": 3, "resnet101": 3, "resnet152": 7}[self.architecture]
-        for i in range(block_count):
-            x = self.identity_block(x, 3, [128, 128, 512], stage=3, block=chr(98+i), data_format=self.data_format, training=training)
-        C3 = x
-        # Stage 4
-        x = self.conv_block(x, 3, [256, 256, 1024], stage=4, block='a', data_format=self.data_format, training=training)
-        block_count = {"resnet50": 5, "resnet101": 22, "resnet152": 37}[self.architecture]
-        for i in range(block_count):
-            x = self.identity_block(x, 3, [256, 256, 1024], stage=4, block=chr(98+i), data_format=self.data_format, training=training)
-        C4 = x
-        # Stage 5
-        x = self.conv_block(x, 3, [512, 512, 2048], stage=5, block='a', data_format=self.data_format, training=training)
-        x = self.identity_block(x, 3, [512, 512, 2048], stage=5, block='b', data_format=self.data_format, training=training)
-        x = self.identity_block(x, 3, [512, 512, 2048], stage=5, block='c', data_format=self.data_format, training=training)
-        C5 = x
-        # Post process
-        x = tf.reduce_mean(x, axis=[2, 3] if self.data_format == "channels_first" else [1, 2])
-        x = Dense(self.classes)(x)
-        return x
+    x = Conv2D(filters1, (1, 1), strides=strides,
+               name=conv_name_base + '2a')(input_tensor)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
+    x = Activation('relu')(x)
+
+    x = Conv2D(filters2, kernel_size, padding='same',
+               name=conv_name_base + '2b')(x)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
+    x = Activation('relu')(x)
+
+    x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
+    x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
+
+    shortcut = Conv2D(filters3, (1, 1), strides=strides,
+                      name=conv_name_base + '1')(input_tensor)
+    shortcut = BatchNormalization(axis=bn_axis, name=bn_name_base + '1')(shortcut)
+
+    x = layers.add([x, shortcut])
+    x = Activation('relu')(x)
+    return x
+
+def ResNetV1(architecture, inputs, classes, data_format):
+    """
+    architecture: Can be resnet50, resnet101, resnet152
+    inputs: model inputs
+    classes: The classification task classes
+    data_format: channel_first or channel_last, channel_first will run faster in GPU
+    """
+    assert architecture in ['resnet50', 'resnet101', 'resnet152']
+    assert data_format in ['channels_first', 'channels_last']
+
+    bn_axis = 3
+    if data_format == 'channels_first':
+        # Convert the inputs from channels_last (NHWC) to channels_first (NCHW).
+        # This provides a large performance boost on GPU. See
+        # https://www.tensorflow.org/performance/performance_guide#data_formats
+        bn_axis = 1
+
+    x = ZeroPadding2D((3, 3), data_format=data_format)(inputs)
+    x = Conv2D(64, (7, 7), strides=(2, 2), name='conv1', data_format=data_format)(x)
+    x = BatchNormalization(axis=bn_axis, name='bn_conv1')(x)
+    x = Activation('relu')(x)
+    x = MaxPool2D((3, 3), strides=(2, 2), data_format=data_format)(x)
+
+    x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', data_format=data_format, strides=(1, 1))
+    x = identity_block(x, 3, [64, 64, 256], stage=2, data_format=data_format, block='b')
+    x = identity_block(x, 3, [64, 64, 256], stage=2, data_format=data_format, block='c')
+
+    x = conv_block(x, 3, [128, 128, 512], stage=3, data_format=data_format, block='a')
+    block_count = {"resnet50": 3, "resnet101": 3, "resnet152": 7}[architecture]
+    for i in range(block_count):
+        x = identity_block(x, 3, [128, 128, 512], stage=3, data_format=data_format, block=chr(98+i))
+
+
+    x = conv_block(x, 3, [256, 256, 1024], stage=4, data_format=data_format, block='a')
+    block_count = {"resnet50": 5, "resnet101": 22, "resnet152": 37}[architecture]
+    for i in range(block_count):
+        x = identity_block(x, 3, [256, 256, 1024], stage=4, data_format=data_format, block=chr(98+i))
+
+    x = conv_block(x, 3, [512, 512, 2048], stage=5, data_format=data_format, block='a')
+    x = identity_block(x, 3, [512, 512, 2048], stage=5, data_format=data_format, block='b')
+    x = identity_block(x, 3, [512, 512, 2048], stage=5, data_format=data_format, block='c')
+
+    x = AveragePooling2D((7, 7), name='avg_pool', data_format=data_format)(x)
+
+    x = Flatten()(x)
+    x = Dense(classes, activation='softmax', name='fc')(x)
+
+    # Create model.
+    model = Model(inputs, x, name=architecture)
+    return model

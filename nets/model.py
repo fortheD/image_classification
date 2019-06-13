@@ -32,34 +32,38 @@ classification_models = ["Xception",
                            "NASNetLarge"]
 
 class ClassifyModel(object):
-    def __init__(self, model_name, classes, data_format):
+    def __init__(self, input_shape, model_name, classes, data_format):
         """
         model_name: model_name should be supported in classification_models list
         classes: The classification task classes
-        data_format: channel_first or channel_last, channel_first will run faster in GPU
+        data_format: channels_first or channels_last, channels_first will run faster in GPU
         """
-        self.model = self.build(model_name, classes, data_format)
+        super(ClassifyModel, self).__init__()
+        if data_format == "channels_first":
+            input_shape = (input_shape[2], input_shape[0], input_shape[1])
+        inputs = tf.keras.layers.Input(shape=input_shape)
+        self.model = self.build(model_name, inputs, classes, data_format)
 
-    def build(self, model_name, classes, data_format):
+    def build(self, model_name, inputs, classes, data_format):
         if model_name == "VGG16":
-            model = VGG16(classes, data_format)
+            model = VGG16(inputs, classes, data_format)
         elif model_name == "VGG19":
-            model = VGG19(classes, data_format)
+            model = VGG19(inputs, classes, data_format)
         elif model_name == "ResNet50":
-            model = ResNetV1('resnet50', classes, data_format)
+            model = ResNetV1('resnet50', inputs, classes, data_format)
         elif model_name == "ResNet101":
-            model = ResNetV1('resnet101', classes, data_format)
+            model = ResNetV1('resnet101', inputs, classes, data_format)
         elif model_name == "ResNet152":
-            model = ResNetV1('resnet152', classes, data_format)
+            model = ResNetV1('resnet152', inputs, classes, data_format)
         elif model_name == "ResNet50V2":
-            model = ResNetV2("resnet50", classes, data_format)
+            model = ResNetV2("resnet50", inputs, classes, data_format)
         elif model_name == "ResNet101V2":
-            model = ResNetV2("resnet101", classes, data_format)
+            model = ResNetV2("resnet101", inputs, classes, data_format)
         elif model_name == "ResNet152V2":
-            model = ResNetV2("resnet152", classes, data_format)
+            model = ResNetV2("resnet152", inputs, classes, data_format)
         elif model_name == "InceptionV3":
-            model = InceptionV3(classes, data_format)
+            model = InceptionV3(inputs, classes, data_format)
         return model
 
-    def __call__(self, input_tensor, training):
-        return self.model(input_tensor, training)
+    def keras_model(self):
+        return self.model

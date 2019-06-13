@@ -12,7 +12,7 @@ from process_data.create_tf_record import _RANDOM_SEED, _NUM_SHARDS, _RATE_VAL_A
 from process_data.create_tf_record import convert_record
 from process_data.read_tf_record import train, val
 
-from estimator.create_estimator import Classifier
+from nets.model import ClassifyModel
 
 flags = tf.app.flags
 
@@ -21,7 +21,7 @@ tf.flags.DEFINE_string('tfrecord_dir', '/tmp/record', 'Temporary directory of re
 tf.flags.DEFINE_string('model_dir', '/tmp/train', 'Saved model directory')
 tf.flags.DEFINE_string('export_dir', '', 'The export model directory')
 tf.flags.DEFINE_integer('batch_size', '16', 'The training dataset batch size')
-tf.flags.DEFINE_integer('train_epochs', '200', 'The training epochs')
+tf.flags.DEFINE_integer('train_epochs', '2', 'The training epochs')
 
 FLAGS = flags.FLAGS
 
@@ -36,10 +36,14 @@ def run(flags):
         tf.gfile.MakeDirs(flags.tfrecord_dir)
 
     # Define nerve network input shape
-    input_shape = (299, 299, 3)
+    input_shape = (224, 224, 3)
 
     image_dir = flags.image_dir
     record_dir = flags.tfrecord_dir
+    model_dir = flags.model_dir
+
+    batch_size = flags.batch_size
+    train_epochs = flags.train_epochs
 
     photo_filenames, class_names = get_filenames_and_classes(image_dir)
     class_names_to_ids = dict(zip(class_names, range(len(class_names))))
@@ -70,42 +74,40 @@ def run(flags):
     """"
     Begin to train a classifier
     """
-    session_config = tf.ConfigProto(allow_soft_placement=True)
-    run_config = tf.estimator.RunConfig(session_config=session_config)
-
     data_format = ('channels_first' if tf.test.is_built_with_cuda() else 'channels_last')
 
-    classifier = Classifier("InceptionV3", len(class_names), data_format)
-    estimator = tf.estimator.Estimator(
-        model_fn=classifier.model_fn,
-        model_dir=flags.model_dir,
-        config=run_config,
-        params={'image_nums':len(training_filenames)}
-    )
+    classify_model = ClassifyModel(input_shape=input_shape, model_name="InceptionV3", classes=len(class_names), data_format=data_format)
+    model = classify_model.keras_model()
 
-    #Set up training input function
+    model.compile(optimizer = tf.keras.optimizers.SGD(lr=0.001, momentum=0.9), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+    # Set up training input function
     def train_input_fn():
-        ds = train(record_dir, input_shape)
-        ds = ds.cache().shuffle(buffer_size=20000).batch(flags.batch_size)
-        ds = ds.repeat(1)
+        ds = train(record_dir, input_shape, data_format)
+        ds = ds.cache().shuffle(buffer_size=20000).batch(batch_size)
+        ds = ds.repeat(train_epochs)
         return ds
-    
-    #Set up evaluation input function
-    def eval_input_fn():
-        return val(record_dir, input_shape).batch(flags.batch_size)
+    train_dataset = train_input_fn()
 
-    for _ in range(flags.train_epochs):
-        estimator.train(input_fn=train_input_fn)
-        eval_results = estimator.evaluate(input_fn=eval_input_fn)
-        tf.logging.info('\nEvaluation results:\n\t%s\n' % eval_results)
+    callbacks = [tf.keras.callbacks.TensorBoard(log_dir='/tmp/train')]
+    model.fit(x=train_dataset, 
+            epochs=train_epochs,
+            verbose=1,
+            steps_per_epoch=(int(len(training_filenames)/batch_size)),
+            callbacks=callbacks)
 
-    #Export the model as saved_model format
-    if flags.export_dir is not None:
-        image = tf.placeholder(tf.float32, [None, input_shape[0], input_shape[1], input_shape[2]])
-        input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(
-            {'image': image,}
-        )
-        estimator.export_savedmodel(flags.export_dir, input_fn, strip_default_attrs=True)
+    SAVED_MODEL_PATH = '/home/leike/resnet.h5'
+    model.save_weights(SAVED_MODEL_PATH, save_format='h5')
+    tf.logging.info('saved weights complete')
+    return
+
+    # #Export the model as saved_model format
+    # if flags.export_dir is not None:
+    #     image = tf.placeholder(tf.float32, [None, input_shape[0], input_shape[1], input_shape[2]])
+    #     input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(
+    #         {'image': image,}
+    #     )
+    #     estimator.export_savedmodel(flags.export_dir, input_fn, strip_default_attrs=True)
 
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)

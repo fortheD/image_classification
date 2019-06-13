@@ -1,232 +1,285 @@
-from __future__ import absolute_import
-from __future__ import division
+# -*- coding: utf-8 -*-
+"""Inception V3 model for Keras.
+
+Note that the input image format for this model is different than for
+the VGG16 and ResNet models (299x299 instead of 224x224),
+and that the input preprocessing function is also different (same as Xception).
+
+# Reference
+
+- [Rethinking the Inception Architecture for Computer Vision](http://arxiv.org/abs/1512.00567)
+
+"""
 from __future__ import print_function
+from __future__ import absolute_import
 
 import tensorflow as tf
 
-# from tensorflow.keras.layers import BatchNormalization
-from tensorflow.keras.layers import Conv2D
-from tensorflow.keras.layers import Activation, Add
-from tensorflow.keras.layers import ZeroPadding2D, MaxPool2D, AveragePooling2D
+from tensorflow.keras.layers import Input
+from tensorflow.keras import layers
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import concatenate
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import MaxPool2D
+from tensorflow.keras.layers import GlobalMaxPooling2D
+from tensorflow.keras.layers import ZeroPadding2D
+from tensorflow.keras.layers import AveragePooling2D
 from tensorflow.keras.layers import GlobalAveragePooling2D
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.models import Model
 
-_BATCH_NORM_DECAY = 0.997
-_BATCH_NORM_EPSILON = 1e-5
+from functools import partial
 
-def batch_norm(inputs, training, data_format, name):
-    """Performs a batch normalization using a standard set of parameters."""
-    # We set fused=True for a significant performance boost. See
-    # https://www.tensorflow.org/performance/performance_guide#common_fused_ops
-    return tf.layers.batch_normalization(
-        inputs=inputs, axis=1 if data_format == "channels_first" else 3,
-        momentum=_BATCH_NORM_DECAY, epsilon=_BATCH_NORM_EPSILON, center=True,
-        scale=True, training=training, name=name, fused=True)
+def wrap_conv2d_bn(x,
+                filters,
+                num_row,
+                num_col,
+                data_format='channels_last',
+                padding='same',
+                strides=(1, 1),
+                name=None):
+    """Utility function to apply conv + BN.
 
-class InceptionV3(object):
+    Arguments:
+        x: input tensor.
+        filters: filters in `Conv2D`.
+        num_row: height of the convolution kernel.
+        num_col: width of the convolution kernel.
+        padding: padding mode in `Conv2D`.
+        strides: strides in `Conv2D`.
+        name: name of the ops; will become `name + '_conv'`
+            for the convolution and `name + '_bn'` for the
+            batch norm layer.
+
+    Returns:
+        Output tensor after applying `Conv2D` and `BatchNormalization`.
     """
-    The class of inception(version3)
-    """
-    def __init__(self, classes, data_format):
-        """
+    if name is not None:
+        bn_name = name + '_bn'
+        conv_name = name + '_conv'
+    else:
+        bn_name = None
+        conv_name = None
+    if data_format == 'channels_first':
+        bn_axis = 1
+    else:
+        bn_axis = 3
+    x = Conv2D(
+        filters, (num_row, num_col),
+        strides=strides,
+        padding=padding,
+        use_bias=False,
+        name=conv_name)(x)
+    x = BatchNormalization(axis=bn_axis, scale=False, name=bn_name)(x)
+    x = Activation('relu', name=name)(x)
+    return x
+
+
+def InceptionV3(inputs, classes, data_format):
+    """Instantiates the Inception v3 architecture.
+    Note that the default input image size for this model is 299x299.
+
+    Arguments:
+        inputs: model inputs
         classes: The classification task classes
         data_format: channel_first or channel_last, channel_first will run faster in GPU
-        """
-        super(InceptionV3, self).__init__()
-        assert data_format in ['channels_first', 'channels_last']
-        self.classes = classes
-        self.data_format = data_format
 
-    def conv2d_bn(self, input_tensor, filters, num_row, num_col, padding='same', strides=(1, 1), training=True, name=None):
-        if name is not None:
-            bn_name = name + '_bn'
-            conv_name = name + '_conv'
-        else:
-            bn_name = None
-            conv_name = None
-        x = Conv2D(filters, (num_row, num_col), strides=strides, padding=padding, use_bias=False, data_format=self.data_format, name=conv_name)(input_tensor)
-        x = batch_norm(x, training=training, data_format=self.data_format, name=bn_name)
-        x = Activation('relu', name=name)(x)
-        return x
+    Returns:
+        A Keras model instance.
 
-    def __call__(self, input_tensor, training):
-        if self.data_format == 'channels_first':
-            # Convert the inputs from channels_last (NHWC) to channels_first (NCHW).
-            # This provides a large performance boost on GPU. See
-            # https://www.tensorflow.org/performance/performance_guide#data_formats
-            input_tensor = tf.transpose(input_tensor, [0, 3, 1, 2])
+    Raises:
+        ValueError: in case of invalid argument for `weights`,
+            or invalid input shape.
+    """
+    channel_axis = 3
+    if data_format == 'channels_first':
+        # Convert the inputs from channels_last (NHWC) to channels_first (NCHW).
+        # This provides a large performance boost on GPU. See
+        # https://www.tensorflow.org/performance/performance_guide#data_formats
+        channel_axis = 1
 
-        x = self.conv2d_bn(input_tensor, 32, 3, 3,  padding='valid', strides=(2,2), training=training)
-        x = self.conv2d_bn(x, 32, 3, 3, padding='valid', training=training)
-        x = self.conv2d_bn(x, 64, 3, 3, training=training)
-        x = MaxPool2D((3, 3), strides=(2, 2), data_format=self.data_format)(x)
+    conv2d_bn = partial(wrap_conv2d_bn, data_format=data_format)
 
-        x = self.conv2d_bn(x, 80, 1, 1, padding='valid', training=training)
-        x = self.conv2d_bn(x, 192, 3, 3, padding='valid', training=training)
-        x = MaxPool2D((3, 3), strides=(2, 2), data_format=self.data_format)(x)
+    x = conv2d_bn(inputs, 32, 3, 3, strides=(2, 2), padding='valid')
+    x = conv2d_bn(x, 32, 3, 3, padding='valid')
+    x = conv2d_bn(x, 64, 3, 3)
+    x = MaxPool2D((3, 3), strides=(2, 2))(x)
 
-        # mixed 0, 1, 2: 35 * 35 * 256
-        branch1x1 = self.conv2d_bn(x, 64, 1, 1, training=training)
+    x = conv2d_bn(x, 80, 1, 1, padding='valid')
+    x = conv2d_bn(x, 192, 3, 3, padding='valid')
+    x = MaxPool2D((3, 3), strides=(2, 2))(x)
 
-        branch5x5 = self.conv2d_bn(x, 48, 1, 1, training=training)
-        branch5x5 = self.conv2d_bn(branch5x5, 64, 5, 5, training=training)
+    # mixed 0, 1, 2: 35 x 35 x 256
+    branch1x1 = conv2d_bn(x, 64, 1, 1)
 
-        branch3x3dbl = self.conv2d_bn(x, 64, 1, 1, training=training)
-        branch3x3dbl = self.conv2d_bn(branch3x3dbl, 96, 3, 3, training=training)
-        branch3x3dbl = self.conv2d_bn(branch3x3dbl, 96, 3, 3, training=training)
+    branch5x5 = conv2d_bn(x, 48, 1, 1)
+    branch5x5 = conv2d_bn(branch5x5, 64, 5, 5)
 
-        branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same', data_format=self.data_format)(x)
-        branch_pool = self.conv2d_bn(branch_pool, 32, 1, 1, training=training)
+    branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+    branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+    branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
 
-        x = concatenate([branch1x1, branch5x5, branch3x3dbl, branch_pool],
-                        axis=1 if self.data_format == "channels_first" else 3,
-                        name='mixed0')
+    branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(x)
+    branch_pool = conv2d_bn(branch_pool, 32, 1, 1)
+    x = layers.concatenate(
+        [branch1x1, branch5x5, branch3x3dbl, branch_pool],
+        axis=channel_axis,
+        name='mixed0')
 
-        # mixed 1: 35 * 35 * 256
-        branch1x1 = self.conv2d_bn(x, 64, 1, 1, training=training)
-    
-        branch5x5 = self.conv2d_bn(x, 48, 1, 1, training=training)
-        branch5x5 = self.conv2d_bn(branch5x5, 64, 5, 5, training=training)
+    # mixed 1: 35 x 35 x 256
+    branch1x1 = conv2d_bn(x, 64, 1, 1)
 
-        branch3x3dbl = self.conv2d_bn(x, 64, 1, 1, training=training)
-        branch3x3dbl = self.conv2d_bn(branch3x3dbl, 96, 3, 3, training=training)
-        branch3x3dbl = self.conv2d_bn(branch3x3dbl, 96, 3, 3, training=training)
+    branch5x5 = conv2d_bn(x, 48, 1, 1)
+    branch5x5 = conv2d_bn(branch5x5, 64, 5, 5)
 
-        branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same', data_format=self.data_format)(x)
-        branch_pool = self.conv2d_bn(branch_pool, 64, 1, 1, training=training)
+    branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+    branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+    branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
 
-        x = concatenate([branch1x1, branch5x5, branch3x3dbl, branch_pool],
-                        axis=1 if self.data_format == "channels_first" else 3,
-                        name='mixed1')
+    branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(x)
+    branch_pool = conv2d_bn(branch_pool, 64, 1, 1)
+    x = layers.concatenate(
+        [branch1x1, branch5x5, branch3x3dbl, branch_pool],
+        axis=channel_axis,
+        name='mixed1')
 
-        # mixed 2
-        branch1x1 = self.conv2d_bn(x, 64, 1, 1, training=training)
-    
-        branch5x5 = self.conv2d_bn(x, 48, 1, 1, training=training)
-        branch5x5 = self.conv2d_bn(branch5x5, 64, 5, 5, training=training)
+    # mixed 2: 35 x 35 x 256
+    branch1x1 = conv2d_bn(x, 64, 1, 1)
 
-        branch3x3dbl = self.conv2d_bn(x, 64, 1, 1, training=training)
-        branch3x3dbl = self.conv2d_bn(branch3x3dbl, 96, 3, 3, training=training)
-        branch3x3dbl = self.conv2d_bn(branch3x3dbl, 96, 3, 3, training=training)
+    branch5x5 = conv2d_bn(x, 48, 1, 1)
+    branch5x5 = conv2d_bn(branch5x5, 64, 5, 5)
 
-        branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same', data_format=self.data_format)(x)
-        branch_pool = self.conv2d_bn(branch_pool, 64, 1, 1, training=training)
+    branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+    branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+    branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
 
-        x = concatenate([branch1x1, branch5x5, branch3x3dbl, branch_pool],
-                        axis=1 if self.data_format == "channels_first" else 3,
-                        name='mixed2')
+    branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(x)
+    branch_pool = conv2d_bn(branch_pool, 64, 1, 1)
+    x = layers.concatenate(
+        [branch1x1, branch5x5, branch3x3dbl, branch_pool],
+        axis=channel_axis,
+        name='mixed2')
 
-        # mixed 3
-        branch3x3 = self.conv2d_bn(x, 384, 3, 3, strides=(2, 2), padding='valid', training=training)
+    # mixed 3: 17 x 17 x 768
+    branch3x3 = conv2d_bn(x, 384, 3, 3, strides=(2, 2), padding='valid')
 
-        branch3x3dbl = self.conv2d_bn(x, 64, 1, 1, training=training)
-        branch3x3dbl = self.conv2d_bn(branch3x3dbl, 96, 3, 3, training=training)
-        branch3x3dbl = self.conv2d_bn(branch3x3dbl, 96, 3, 3, strides=(2, 2), padding='valid', training=training)
+    branch3x3dbl = conv2d_bn(x, 64, 1, 1)
+    branch3x3dbl = conv2d_bn(branch3x3dbl, 96, 3, 3)
+    branch3x3dbl = conv2d_bn(
+        branch3x3dbl, 96, 3, 3, strides=(2, 2), padding='valid')
 
-        branch_pool = MaxPool2D((3, 3), strides=(2, 2), data_format=self.data_format)(x)
+    branch_pool = MaxPool2D((3, 3), strides=(2, 2))(x)
+    x = layers.concatenate(
+        [branch3x3, branch3x3dbl, branch_pool], axis=channel_axis, name='mixed3')
 
-        x = concatenate([branch3x3, branch3x3dbl, branch_pool],
-                        axis=1 if self.data_format == "channels_first" else 3,
-                        name='mixed3')
+    # mixed 4: 17 x 17 x 768
+    branch1x1 = conv2d_bn(x, 192, 1, 1)
 
-        # mixed 4
-        branch1x1 = self.conv2d_bn(x, 192, 1, 1, training=training)
+    branch7x7 = conv2d_bn(x, 128, 1, 1)
+    branch7x7 = conv2d_bn(branch7x7, 128, 1, 7)
+    branch7x7 = conv2d_bn(branch7x7, 192, 7, 1)
 
-        branch7x7 = self.conv2d_bn(x, 128, 1, 1, training=training)
-        branch7x7 = self.conv2d_bn(branch7x7, 128, 1, 7, training=training)
-        branch7x7 = self.conv2d_bn(branch7x7, 192, 7, 1, training=training)
+    branch7x7dbl = conv2d_bn(x, 128, 1, 1)
+    branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 7, 1)
+    branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 1, 7)
+    branch7x7dbl = conv2d_bn(branch7x7dbl, 128, 7, 1)
+    branch7x7dbl = conv2d_bn(branch7x7dbl, 192, 1, 7)
 
-        branch7x7dbl = self.conv2d_bn(x, 128, 1, 1, training=training)
-        branch7x7dbl = self.conv2d_bn(branch7x7dbl, 128, 7, 1, training=training)
-        branch7x7dbl = self.conv2d_bn(branch7x7dbl, 128, 1, 7, training=training)
-        branch7x7dbl = self.conv2d_bn(branch7x7dbl, 128, 7, 1, training=training)
-        branch7x7dbl = self.conv2d_bn(branch7x7dbl, 192, 1, 7, training=training)
+    branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(x)
+    branch_pool = conv2d_bn(branch_pool, 192, 1, 1)
+    x = layers.concatenate(
+        [branch1x1, branch7x7, branch7x7dbl, branch_pool],
+        axis=channel_axis,
+        name='mixed4')
 
-        branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same', data_format=self.data_format)(x)
-        branch_pool = self.conv2d_bn(branch_pool, 192, 1, 1)
-        x = concatenate([branch1x1, branch7x7, branch7x7dbl, branch_pool],
-                        axis=1 if self.data_format == "channels_first" else 3,
-                        name='mixed4')
+    # mixed 5, 6: 17 x 17 x 768
+    for i in range(2):
+        branch1x1 = conv2d_bn(x, 192, 1, 1)
 
-        # mixed 5,6
-        for i in range(2):
-            branch1x1 = self.conv2d_bn(x, 192, 1, 1, training=training)
+        branch7x7 = conv2d_bn(x, 160, 1, 1)
+        branch7x7 = conv2d_bn(branch7x7, 160, 1, 7)
+        branch7x7 = conv2d_bn(branch7x7, 192, 7, 1)
 
-            branch7x7 = self.conv2d_bn(x, 160, 1, 1, training=training)
-            branch7x7 = self.conv2d_bn(branch7x7, 160, 1, 7, training=training)
-            branch7x7 = self.conv2d_bn(branch7x7, 192, 7, 1, training=training)
+        branch7x7dbl = conv2d_bn(x, 160, 1, 1)
+        branch7x7dbl = conv2d_bn(branch7x7dbl, 160, 7, 1)
+        branch7x7dbl = conv2d_bn(branch7x7dbl, 160, 1, 7)
+        branch7x7dbl = conv2d_bn(branch7x7dbl, 160, 7, 1)
+        branch7x7dbl = conv2d_bn(branch7x7dbl, 192, 1, 7)
 
-            branch7x7dbl = self.conv2d_bn(x, 160, 1, 1, training=training)
-            branch7x7dbl = self.conv2d_bn(branch7x7dbl, 160, 7, 1, training=training)
-            branch7x7dbl = self.conv2d_bn(branch7x7dbl, 160, 1, 7, training=training)
-            branch7x7dbl = self.conv2d_bn(branch7x7dbl, 160, 7, 1, training=training)
-            branch7x7dbl = self.conv2d_bn(branch7x7dbl, 192, 1, 7, training=training)
+        branch_pool = AveragePooling2D(
+            (3, 3), strides=(1, 1), padding='same')(x)
+        branch_pool = conv2d_bn(branch_pool, 192, 1, 1)
+        x = layers.concatenate(
+            [branch1x1, branch7x7, branch7x7dbl, branch_pool],
+            axis=channel_axis,
+            name='mixed' + str(5 + i))
 
-            branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same', data_format=self.data_format)(x)
-            branch_pool = self.conv2d_bn(branch_pool, 192, 1, 1)
-            x = concatenate([branch1x1, branch7x7, branch7x7dbl, branch_pool],
-                            axis=1 if self.data_format == "channels_first" else 3,
-                            name='mixed' + str(5+i))
+    # mixed 7: 17 x 17 x 768
+    branch1x1 = conv2d_bn(x, 192, 1, 1)
 
-        # mixed 7
-        branch1x1 = self.conv2d_bn(x, 192, 1, 1, training=training)
+    branch7x7 = conv2d_bn(x, 192, 1, 1)
+    branch7x7 = conv2d_bn(branch7x7, 192, 1, 7)
+    branch7x7 = conv2d_bn(branch7x7, 192, 7, 1)
 
-        branch7x7 = self.conv2d_bn(x, 192, 1, 1, training=training)
-        branch7x7 = self.conv2d_bn(branch7x7, 192, 1, 7, training=training)
-        branch7x7 = self.conv2d_bn(branch7x7, 192, 7, 1, training=training)
+    branch7x7dbl = conv2d_bn(x, 192, 1, 1)
+    branch7x7dbl = conv2d_bn(branch7x7dbl, 192, 7, 1)
+    branch7x7dbl = conv2d_bn(branch7x7dbl, 192, 1, 7)
+    branch7x7dbl = conv2d_bn(branch7x7dbl, 192, 7, 1)
+    branch7x7dbl = conv2d_bn(branch7x7dbl, 192, 1, 7)
 
-        branch7x7dbl = self.conv2d_bn(x, 192, 1, 1, training=training)
-        branch7x7dbl = self.conv2d_bn(branch7x7dbl, 192, 7, 1, training=training)
-        branch7x7dbl = self.conv2d_bn(branch7x7dbl, 192, 1, 7, training=training)
-        branch7x7dbl = self.conv2d_bn(branch7x7dbl, 192, 7, 1, training=training)
-        branch7x7dbl = self.conv2d_bn(branch7x7dbl, 192, 1, 7, training=training)
+    branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(x)
+    branch_pool = conv2d_bn(branch_pool, 192, 1, 1)
+    x = layers.concatenate(
+        [branch1x1, branch7x7, branch7x7dbl, branch_pool],
+        axis=channel_axis,
+        name='mixed7')
 
-        branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same', data_format=self.data_format)(x)
-        branch_pool = self.conv2d_bn(branch_pool, 192, 1, 1)
-        x = concatenate([branch1x1, branch7x7, branch7x7dbl, branch_pool],
-                        axis=1 if self.data_format == "channels_first" else 3,
-                        name='mixed7')
+    # mixed 8: 8 x 8 x 1280
+    branch3x3 = conv2d_bn(x, 192, 1, 1)
+    branch3x3 = conv2d_bn(branch3x3, 320, 3, 3,
+                          strides=(2, 2), padding='valid')
 
-        # mixed 8
-        branch3x3 = self.conv2d_bn(x, 192, 1, 1, training=training)
-        branch3x3 = self.conv2d_bn(branch3x3, 320, 3, 3, strides=(2,2), padding='valid')
+    branch7x7x3 = conv2d_bn(x, 192, 1, 1)
+    branch7x7x3 = conv2d_bn(branch7x7x3, 192, 1, 7)
+    branch7x7x3 = conv2d_bn(branch7x7x3, 192, 7, 1)
+    branch7x7x3 = conv2d_bn(
+        branch7x7x3, 192, 3, 3, strides=(2, 2), padding='valid')
 
-        branch7x7x3 = self.conv2d_bn(x, 192, 1, 1, training=training)
-        branch7x7x3 = self.conv2d_bn(branch7x7x3, 192, 1, 7, training=training)
-        branch7x7x3 = self.conv2d_bn(branch7x7x3, 192, 7, 1, training=training)
-        branch7x7x3 = self.conv2d_bn(branch7x7x3, 192, 3, 3, strides=(2,2), padding='valid')
+    branch_pool = MaxPool2D((3, 3), strides=(2, 2))(x)
+    x = layers.concatenate(
+        [branch3x3, branch7x7x3, branch_pool], axis=channel_axis, name='mixed8')
 
-        branch_pool = MaxPool2D((3, 3), strides=(2, 2), data_format=self.data_format)(x)
-        x = concatenate([branch3x3, branch7x7x3, branch_pool],
-                        axis=1 if self.data_format == "channels_first" else 3,
-                        name='mixed8')
+    # mixed 9: 8 x 8 x 2048
+    for i in range(2):
+        branch1x1 = conv2d_bn(x, 320, 1, 1)
 
-        # mixed 9
-        for i in range(2):
-            branch1x1 = self.conv2d_bn(x, 320, 1, 1, training=training)
+        branch3x3 = conv2d_bn(x, 384, 1, 1)
+        branch3x3_1 = conv2d_bn(branch3x3, 384, 1, 3)
+        branch3x3_2 = conv2d_bn(branch3x3, 384, 3, 1)
+        branch3x3 = layers.concatenate(
+            [branch3x3_1, branch3x3_2], axis=channel_axis, name='mixed9_' + str(i))
 
-            branch3x3 = self.conv2d_bn(x, 384, 1, 1, training=training)
-            branch3x3_1 = self.conv2d_bn(branch3x3, 384, 1, 3)
-            branch3x3_2 = self.conv2d_bn(branch3x3, 384, 3, 1)
-            branch3x3 = concatenate([branch3x3_1, branch3x3_2],
-                                    axis=1 if self.data_format == "channels_first" else 3,
-                                    name='mixed9_'+str(i))
+        branch3x3dbl = conv2d_bn(x, 448, 1, 1)
+        branch3x3dbl = conv2d_bn(branch3x3dbl, 384, 3, 3)
+        branch3x3dbl_1 = conv2d_bn(branch3x3dbl, 384, 1, 3)
+        branch3x3dbl_2 = conv2d_bn(branch3x3dbl, 384, 3, 1)
+        branch3x3dbl = layers.concatenate(
+            [branch3x3dbl_1, branch3x3dbl_2], axis=channel_axis)
 
-            branch3x3dbl = self.conv2d_bn(x, 448, 1, 1, training=training)
-            branch3x3dbl = self.conv2d_bn(branch3x3dbl, 384, 3, 3, training=training)
-            branch3x3dbl_1 = self.conv2d_bn(branch3x3dbl, 384, 1, 3, training=training)
-            branch3x3dbl_2 = self.conv2d_bn(branch3x3dbl, 384, 3, 1, training=training)
-            branch3x3dbl = concatenate([branch3x3dbl_1, branch3x3dbl_2],
-                                        axis=1 if self.data_format == "channels_first" else 3)
+        branch_pool = AveragePooling2D(
+            (3, 3), strides=(1, 1), padding='same')(x)
+        branch_pool = conv2d_bn(branch_pool, 192, 1, 1)
+        x = layers.concatenate(
+            [branch1x1, branch3x3, branch3x3dbl, branch_pool],
+            axis=channel_axis,
+            name='mixed' + str(9 + i))
 
-            branch_pool = AveragePooling2D((3, 3), strides=(1, 1), padding='same', data_format=self.data_format)(x)
-            branch_pool = self.conv2d_bn(branch_pool, 192, 1, 1, training=training)
-            x = concatenate([branch1x1, branch3x3, branch3x3dbl, branch_pool],
-                            axis=1 if self.data_format == "channels_first" else 3,
-                            name='mixed'+str(9+i))
 
-        x = GlobalAveragePooling2D(data_format=self.data_format, name='avg_pool')(x)
-        x = Dense(self.classes, activation='softmax', name='predictions')(x)
+    # Classification block
+    x = GlobalAveragePooling2D(name='avg_pool')(x)
+    x = Dense(classes, activation='softmax', name='predictions')(x)
 
-        return x
+    # Create model.
+    model = Model(inputs, x, name='inception_v3')
+    return model
