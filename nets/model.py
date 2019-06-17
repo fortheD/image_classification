@@ -51,43 +51,43 @@ class ClassifyModel(object):
 
     def build(self, model_name, inputs, classes, data_format):
         if model_name == "Xception":
-            model = Xception(inputs, classes, data_format)
+            model = Xception(inputs, classes)
         elif model_name == "VGG16":
-            model = VGG16(inputs, classes, data_format)
+            model = VGG16(inputs, classes)
         elif model_name == "VGG19":
-            model = VGG19(inputs, classes, data_format)
+            model = VGG19(inputs, classes)
         elif model_name == "ResNet50":
-            model = ResNetV1('resnet50', inputs, classes, data_format)
+            model = ResNetV1('resnet50', inputs, classes)
         elif model_name == "ResNet101":
-            model = ResNetV1('resnet101', inputs, classes, data_format)
+            model = ResNetV1('resnet101', inputs, classes)
         elif model_name == "ResNet152":
-            model = ResNetV1('resnet152', inputs, classes, data_format)
+            model = ResNetV1('resnet152', inputs, classes)
         elif model_name == "ResNet50V2":
-            model = ResNetV2("resnet50", inputs, classes, data_format)
+            model = ResNetV2("resnet50", inputs, classes)
         elif model_name == "ResNet101V2":
-            model = ResNetV2("resnet101", inputs, classes, data_format)
+            model = ResNetV2("resnet101", inputs, classes)
         elif model_name == "ResNet152V2":
-            model = ResNetV2("resnet152", inputs, classes, data_format)
+            model = ResNetV2("resnet152", inputs, classes)
         elif model_name == "ResNeXt50":
-            model = ResNext("resnet50", inputs, classes, data_format)
+            model = ResNext("resnet50", inputs, classes)
         elif model_name == "ResNeXt101":
-            model = ResNext("resnet101", inputs, classes, data_format)
+            model = ResNext("resnet101", inputs, classes)
         elif model_name == "ResNeXt152":
-            model = ResNext("resnet152", inputs, classes, data_format)
+            model = ResNext("resnet152", inputs, classes)
         elif model_name == "InceptionV3":
-            model = InceptionV3(inputs, classes, data_format)
+            model = InceptionV3(inputs, classes)
         elif model_name == "InceptionResNetV2":
-            model = InceptionResNetV2(inputs, classes, data_format)
+            model = InceptionResNetV2(inputs, classes)
         elif model_name == "MobileNet":
             model = MobileNet(inputs, classes)
         elif model_name == "MobileNetV2":
             model = MobileNetV2(inputs, classes)
         elif model_name == "DenseNet121":
-            model = DenseNet("densenet121", inputs, classes, data_format)
+            model = DenseNet("densenet121", inputs, classes)
         elif model_name == "DenseNet169":
-            model = DenseNet("densenet169", inputs, classes, data_format)
+            model = DenseNet("densenet169", inputs, classes)
         elif model_name == "DenseNet201":
-            model = DenseNet("densenet201", inputs, classes, data_format)
+            model = DenseNet("densenet201", inputs, classes)
         return model
 
     def keras_model(self):

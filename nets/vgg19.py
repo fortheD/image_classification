@@ -16,12 +16,11 @@ from tensorflow.keras.layers import Conv2D
 from tensorflow.keras.layers import MaxPool2D
 from tensorflow.keras.models import Model
 
-def VGG19(inputs, classes, data_format):
+def VGG19(inputs, classes):
     """Instantiates the VGG16 architecture.
     # Arguments
         inputs: Model inputs
         classes: The classification task classes
-        data_format: channel_first or channel_last, channel_first will run faster in GPU
 
     # Returns
         A Keras model instance.

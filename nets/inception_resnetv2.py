@@ -149,7 +149,7 @@ def inception_resnet_block(x, scale, block_type, block_idx, activation='relu'):
     return x
 
 
-def InceptionResNetV2(inputs, classes, data_format):
+def InceptionResNetV2(inputs, classes):
     """Instantiates the Inception-ResNet v2 architecture.
 
     Optionally loads weights pre-trained on ImageNet.
@@ -165,7 +165,6 @@ def InceptionResNetV2(inputs, classes, data_format):
     # Arguments
         inputs: model inputs
         classes: The classification task classes
-        data_format: channel_first or channel_last, channel_first will run faster in GPU
 
     # Returns
         A Keras `Model` instance.
@@ -175,6 +174,7 @@ def InceptionResNetV2(inputs, classes, data_format):
             or invalid input shape.
         RuntimeError: If attempting to run this model with an unsupported backend.
     """
+    assert K.image_data_format() == 'channels_last'
     # Stem block: 35 x 35 x 192
     x = conv2d_bn(inputs, 32, 3, strides=2, padding='valid')
     x = conv2d_bn(x, 32, 3, padding='valid')

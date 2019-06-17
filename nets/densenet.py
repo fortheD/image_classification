@@ -23,6 +23,7 @@ from tensorflow.keras.layers import Concatenate
 from tensorflow.keras.layers import GlobalAveragePooling2D
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.models import Model
+from tensorflow.keras import backend as K
 
 def dense_block(x, blocks, name):
     """A dense block.
@@ -92,7 +93,7 @@ def conv_block(x, growth_rate, name):
     return x
 
 
-def DenseNet(architecture, inputs, classes, data_format):
+def DenseNet(architecture, inputs, classes):
     """Instantiates the DenseNet architecture.
 
     Optionally loads weights pre-trained on ImageNet.
@@ -103,7 +104,6 @@ def DenseNet(architecture, inputs, classes, data_format):
         architecture: Can be densenet121, densenet169, densenet201
         inputs: model inputs
         classes: The classification task classes
-        data_format: channel_first or channel_last, channel_first will run faster in GPU
 
     # Returns
         A Keras model instance.

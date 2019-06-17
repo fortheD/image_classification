@@ -22,7 +22,6 @@ from __future__ import absolute_import
 
 import tensorflow as tf
 
-from tensorflow.keras.layers import Input
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Activation
@@ -37,7 +36,9 @@ from tensorflow.keras.layers import GlobalAveragePooling2D
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.models import Model
 
-def Xception(inputs, classes, data_format):
+from tensorflow.keras import backend as K
+
+def Xception(inputs, classes):
     """Instantiates the Xception architecture.
 
     Note that the default input image size for this model is 299x299.
@@ -45,7 +46,6 @@ def Xception(inputs, classes, data_format):
     # Arguments
         inputs: model inputs
         classes: The classification task classes
-        data_format: channel_first or channel_last, channel_first will run faster in GPU
 
     # Returns
         A Keras model instance.
@@ -56,17 +56,7 @@ def Xception(inputs, classes, data_format):
         RuntimeError: If attempting to run this model with a
             backend that does not support separable convolutions.
     """
-    if data_format != 'channels_last':
-        warnings.warn('The Xception model is only available for the '
-                      'input data format "channels_last" '
-                      '(width, height, channels). '
-                      'However your settings specify the default '
-                      'data format "channels_first" (channels, width, height). '
-                      'You should set `image_data_format="channels_last"` in your Keras '
-                      'config located at ~/.keras/keras.json. '
-                      'The model being returned right now will expect inputs '
-                      'to follow the "channels_last" data format.')
-        return
+    assert K.image_data_format() == 'channels_last':
 
     x = Conv2D(32, (3, 3), strides=(2, 2), use_bias=False, name='block1_conv1')(inputs)
     x = BatchNormalization(name='block1_conv1_bn')(x)
