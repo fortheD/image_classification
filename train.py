@@ -6,6 +6,8 @@ import random
 
 import tensorflow as tf
 
+from tensorflow.keras import backend as K
+
 from utils import dataset_util
 from process_data.create_tf_record import record_exists, get_filenames_and_classes
 from process_data.create_tf_record import _RANDOM_SEED, _NUM_SHARDS, _RATE_VAL_ALL
@@ -74,9 +76,9 @@ def run(flags):
     """"
     Begin to train a classifier
     """
-    data_format = ('channels_first' if tf.test.is_built_with_cuda() else 'channels_last')
+    data_format = K.image_data_format()
 
-    classify_model = ClassifyModel(input_shape=input_shape, model_name="InceptionV3", classes=len(class_names), data_format=data_format)
+    classify_model = ClassifyModel(input_shape=input_shape, model_name="DenseNet121", classes=len(class_names), data_format=data_format)
     model = classify_model.keras_model()
 
     model.compile(optimizer = tf.keras.optimizers.SGD(lr=0.001, momentum=0.9), loss='sparse_categorical_crossentropy', metrics=['accuracy'])

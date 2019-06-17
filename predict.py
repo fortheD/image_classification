@@ -16,7 +16,7 @@ tf.flags.DEFINE_string('img_path', '/home/leike/proj/traffic_sign/predict_image/
 
 FLAGS = flags.FLAGS
 
-def input_fn():
+def input_fn(image_path):
     img_path = FLAGS.img_path
     image_data = tf.gfile.GFile(img_path, 'rb').read()
     decode_image = tf.image.decode_jpeg(image_data, channels=3)
@@ -35,7 +35,7 @@ def run(flags):
     model = classify_model.keras_model()
     SAVED_MODEL_PATH = '/home/leike/resnet.h5'
     model.load_weights(SAVED_MODEL_PATH)
-    inputs = input_fn()
+    inputs = input_fn(flags.image_path)
     result = model.predict(inputs, steps=1)
     print(result)
     return

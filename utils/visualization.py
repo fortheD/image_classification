@@ -8,7 +8,7 @@ from nets.model import ClassifyModel
 
 flags = tf.app.flags
 
-tf.flags.DEFINE_string('model_name', 'VGG16', 'The model you want to visualize')
+tf.flags.DEFINE_string('model_name', 'DenseNet121', 'The model you want to visualize')
 tf.flags.DEFINE_string('saved_path', '/tmp/plotmodel/', 'The model image path')
 
 FLAGS = flags.FLAGS
@@ -17,7 +17,7 @@ def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
     model_name = FLAGS.model_name
 
-    classify_model = ClassifyModel(input_shape=(224,224,3), model_name=model_name, classes=1000, data_format="channels_first")
+    classify_model = ClassifyModel(input_shape=(224,224,3), model_name=model_name, classes=1000, data_format="channels_last")
     model = classify_model.keras_model()
 
     if not tf.gfile.IsDirectory(FLAGS.saved_path):
