@@ -12,6 +12,8 @@ from nets.resnetv2 import ResNetV2
 from nets.resnext import ResNext
 from nets.inceptionv3 import InceptionV3
 from nets.inception_resnetv2 import InceptionResNetV2
+from nets.mobilenet import MobileNet
+from nets.mobilenetv2 import MobileNetV2
 from nets.densenet import DenseNet
 
 classification_models = ["Xception",
@@ -32,9 +34,7 @@ classification_models = ["Xception",
                            "MobileNetV2",
                            "DenseNet121",
                            "DenseNet169",
-                           "DenseNet201",
-                           "NASNetMobile",
-                           "NASNetLarge"]
+                           "DenseNet201"]
 
 class ClassifyModel(object):
     def __init__(self, input_shape, model_name, classes, data_format):
@@ -78,6 +78,10 @@ class ClassifyModel(object):
             model = InceptionV3(inputs, classes, data_format)
         elif model_name == "InceptionResNetV2":
             model = InceptionResNetV2(inputs, classes, data_format)
+        elif model_name == "MobileNet":
+            model = MobileNet(inputs, classes)
+        elif model_name == "MobileNetV2":
+            model = MobileNetV2(inputs, classes)
         elif model_name == "DenseNet121":
             model = DenseNet("densenet121", inputs, classes, data_format)
         elif model_name == "DenseNet169":

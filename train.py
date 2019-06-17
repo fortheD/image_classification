@@ -78,7 +78,7 @@ def run(flags):
     """
     data_format = K.image_data_format()
 
-    classify_model = ClassifyModel(input_shape=input_shape, model_name="DenseNet121", classes=len(class_names), data_format=data_format)
+    classify_model = ClassifyModel(input_shape=input_shape, model_name="MobileNetV2", classes=len(class_names), data_format=data_format)
     model = classify_model.keras_model()
 
     model.compile(optimizer = tf.keras.optimizers.SGD(lr=0.001, momentum=0.9), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
