@@ -28,17 +28,15 @@ from tensorflow.keras.layers import AveragePooling2D
 from tensorflow.keras.layers import GlobalAveragePooling2D
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.models import Model
+from tensorflow.keras import backend as K
 
-from functools import partial
-
-def wrap_conv2d_bn(x,
-                filters,
-                num_row,
-                num_col,
-                data_format='channels_last',
-                padding='same',
-                strides=(1, 1),
-                name=None):
+def conv2d_bn(x,
+            filters,
+            num_row,
+            num_col,
+            padding='same',
+            strides=(1, 1),
+            name=None):
     """Utility function to apply conv + BN.
 
     Arguments:
@@ -55,6 +53,7 @@ def wrap_conv2d_bn(x,
     Returns:
         Output tensor after applying `Conv2D` and `BatchNormalization`.
     """
+    data_format = K.image_data_format()
     if name is not None:
         bn_name = name + '_bn'
         conv_name = name + '_conv'
@@ -76,14 +75,13 @@ def wrap_conv2d_bn(x,
     return x
 
 
-def InceptionV3(inputs, classes, data_format):
+def InceptionV3(inputs, classes):
     """Instantiates the Inception v3 architecture.
     Note that the default input image size for this model is 299x299.
 
     Arguments:
         inputs: model inputs
         classes: The classification task classes
-        data_format: channel_first or channel_last, channel_first will run faster in GPU
 
     Returns:
         A Keras model instance.
@@ -92,14 +90,13 @@ def InceptionV3(inputs, classes, data_format):
         ValueError: in case of invalid argument for `weights`,
             or invalid input shape.
     """
+    data_format = K.image_data_format()
     channel_axis = 3
     if data_format == 'channels_first':
         # Convert the inputs from channels_last (NHWC) to channels_first (NCHW).
         # This provides a large performance boost on GPU. See
         # https://www.tensorflow.org/performance/performance_guide#data_formats
         channel_axis = 1
-
-    conv2d_bn = partial(wrap_conv2d_bn, data_format=data_format)
 
     x = conv2d_bn(inputs, 32, 3, 3, strides=(2, 2), padding='valid')
     x = conv2d_bn(x, 32, 3, 3, padding='valid')

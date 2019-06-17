@@ -11,7 +11,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow.keras.layers import Input
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Activation
@@ -24,6 +23,7 @@ from tensorflow.keras.layers import AveragePooling2D
 from tensorflow.keras.layers import GlobalAveragePooling2D
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.models import Model
+from tensorflow.keras import backend as K
 
 def identity_block(input_tensor, kernel_size, filters, stage, block, data_format):
     """The identity block is the block that has no conv layer at shortcut.
@@ -108,15 +108,14 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, data_format, st
     x = Activation('relu')(x)
     return x
 
-def ResNetV1(architecture, inputs, classes, data_format):
+def ResNetV1(architecture, inputs, classes):
     """
     architecture: Can be resnet50, resnet101, resnet152
     inputs: model inputs
     classes: The classification task classes
-    data_format: channel_first or channel_last, channel_first will run faster in GPU
     """
     assert architecture in ['resnet50', 'resnet101', 'resnet152']
-    assert data_format in ['channels_first', 'channels_last']
+    data_format = K.image_data_format()
 
     bn_axis = 3
     if data_format == 'channels_first':

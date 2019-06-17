@@ -10,7 +10,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from tensorflow.keras.layers import Input
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Activation
@@ -25,6 +24,7 @@ from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import Lambda
 from tensorflow.keras.layers import concatenate
 from tensorflow.keras.models import Model
+from tensorflow.keras import backend as K
 
 def group_conv2d(input_tensor, kernel_size, filters, data_format, cardinatity=32):
     if data_format == 'channels_last':
@@ -121,15 +121,14 @@ def conv_block(input_tensor, kernel_size, filters, stage, block, data_format, st
     x = Activation('relu')(x)
     return x
 
-def ResNext(architecture, inputs, classes, data_format):
+def ResNext(architecture, inputs, classes):
     """
     architecture: Can be resnet50, resnet101, resnet152
     inputs: model inputs
     classes: The classification task classes
-    data_format: channel_first or channel_last, channel_first will run faster in GPU
     """
     assert architecture in ['resnet50', 'resnet101', 'resnet152']
-    assert data_format in ['channels_first', 'channels_last']
+    data_format = K.image_data_format()
 
     bn_axis = 3
     if data_format == 'channels_first':
