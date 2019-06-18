@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import random
+import os
 
 import tensorflow as tf
 
@@ -21,9 +22,11 @@ flags = tf.app.flags
 tf.flags.DEFINE_string('image_dir', '', 'The image directory')
 tf.flags.DEFINE_string('tfrecord_dir', '/tmp/record', 'Temporary directory of record file')
 tf.flags.DEFINE_string('model_dir', '/tmp/train', 'Saved model directory')
-tf.flags.DEFINE_string('export_dir', '', 'The export model directory')
+tf.flags.DEFINE_string('export_dir', '/tmp/export', 'The export model directory')
+tf.flags.DEFINE_string('model_name', 'VGG16', 'The model name')
 tf.flags.DEFINE_integer('batch_size', '16', 'The training dataset batch size')
 tf.flags.DEFINE_integer('train_epochs', '2', 'The training epochs')
+tf.flags.DEFINE_integer('gpu_nums', '1', 'Training gpu numbers')
 
 FLAGS = flags.FLAGS
 
@@ -36,6 +39,10 @@ def run(flags):
     assert flags.model_dir, '`model_dir` missing'
     if not tf.gfile.IsDirectory(flags.tfrecord_dir):
         tf.gfile.MakeDirs(flags.tfrecord_dir)
+    if not tf.gfile.IsDirectory(flags.model_dir):
+        tf.gfile.MakeDirs(flags.model_dir)
+    if not tf.gfile.IsDirectory(flags.export_dir):
+        tf.gfile.MakeDirs(flags.export_dir)
 
     # Define nerve network input shape
     input_shape = (224, 224, 3)
@@ -43,7 +50,7 @@ def run(flags):
     image_dir = flags.image_dir
     record_dir = flags.tfrecord_dir
     model_dir = flags.model_dir
-
+    model_name = flags.model_name
     batch_size = flags.batch_size
     train_epochs = flags.train_epochs
 
@@ -78,7 +85,7 @@ def run(flags):
     """
     data_format = K.image_data_format()
 
-    classify_model = ClassifyModel(input_shape=input_shape, model_name="MobileNetV2", classes=len(class_names), data_format=data_format)
+    classify_model = ClassifyModel(input_shape=input_shape, model_name=model_name, classes=len(class_names), data_format=data_format)
     model = classify_model.keras_model()
 
     model.compile(optimizer = tf.keras.optimizers.SGD(lr=0.001, momentum=0.9), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
@@ -91,25 +98,22 @@ def run(flags):
         return ds
     train_dataset = train_input_fn()
 
-    callbacks = [tf.keras.callbacks.TensorBoard(log_dir='/tmp/train')]
-    model.fit(x=train_dataset, 
+    # Callbacks https://tensorflow.google.cn/tutorials/distribute/keras
+    filepath = os.path.join(model_dir, "cp-{epoch:04d}.ckpt")
+    tf.logging.info(filepath)
+    checkpoint = tf.keras.callbacks.ModelCheckpoint(filepath, save_weights_only=True, verbose=1, period=1)
+    tensorboard = tf.keras.callbacks.TensorBoard(log_dir=model_dir)
+    callbacks = [tensorboard, checkpoint]
+    model.fit(x=train_dataset,
             epochs=train_epochs,
             verbose=1,
             steps_per_epoch=(int(len(training_filenames)/batch_size)),
             callbacks=callbacks)
 
-    SAVED_MODEL_PATH = '/home/leike/resnet.h5'
-    model.save_weights(SAVED_MODEL_PATH, save_format='h5')
-    tf.logging.info('saved weights complete')
+    SAVED_MODEL_PATH = os.path.join(model_dir, model_name+".h5")
+    tf.keras.models.save_model(model, SAVED_MODEL_PATH)
+    tf.logging.info('saved models complete')
     return
-
-    # #Export the model as saved_model format
-    # if flags.export_dir is not None:
-    #     image = tf.placeholder(tf.float32, [None, input_shape[0], input_shape[1], input_shape[2]])
-    #     input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn(
-    #         {'image': image,}
-    #     )
-    #     estimator.export_savedmodel(flags.export_dir, input_fn, strip_default_attrs=True)
 
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)

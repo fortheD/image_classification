@@ -56,7 +56,7 @@ def Xception(inputs, classes):
         RuntimeError: If attempting to run this model with a
             backend that does not support separable convolutions.
     """
-    assert K.image_data_format() == 'channels_last':
+    assert K.image_data_format() == 'channels_last'
 
     x = Conv2D(32, (3, 3), strides=(2, 2), use_bias=False, name='block1_conv1')(inputs)
     x = BatchNormalization(name='block1_conv1_bn')(x)
