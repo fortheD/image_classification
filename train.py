@@ -45,7 +45,25 @@ def run(flags):
         tf.gfile.MakeDirs(flags.export_dir)
 
     # Define nerve network input shape
-    input_shape = (224, 224, 3)
+    if flags.model_name in ["VGG16",
+                           "VGG19",
+                           "ResNet50",
+                           "ResNet101",
+                           "ResNet152",
+                           "ResNet50V2",
+                           "ResNet101V2",
+                           "ResNet152V2",
+                           "ResNeXt50",
+                           "ResNeXt101",
+                           "ResNeXt152",
+                           "MobileNet",
+                           "MobileNetV2",
+                           "DenseNet121",
+                           "DenseNet169",
+                           "DenseNet201"]:
+        input_shape = (224, 224, 3)
+    else:
+        input_shape = (299, 299, 3)
 
     image_dir = flags.image_dir
     record_dir = flags.tfrecord_dir
@@ -87,6 +105,13 @@ def run(flags):
 
     classify_model = ClassifyModel(input_shape=input_shape, model_name=model_name, classes=len(class_names), data_format=data_format)
     model = classify_model.keras_model()
+
+    if flags.gpu_nums > 1:
+        try:
+            model = tf.keras.utils.multi_gpu_model(model, gpus=flags.gpu_nums, cpu_relocation=True)
+            tf.logging.info("Training using multiple GPUS")
+        except:
+            tf.logging.info("Training using single GPU")
 
     model.compile(optimizer = tf.keras.optimizers.SGD(lr=0.001, momentum=0.9), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
